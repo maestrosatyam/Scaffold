@@ -1,0 +1,12 @@
+import { project } from '../src/core/engine.ts';
+import { buildSeedEvents } from '../src/demo/seed.ts';
+import { independenceReport } from '../src/core/views.ts';
+const tz = 'America/Los_Angeles';
+const ev = buildSeedEvents({ today: '2026-10-18', timeZone: tz });
+const s = project('sam', ev, { timeZone: tz });
+const r = independenceReport(s, 'morning');
+console.log(ev.length, 'events');
+console.log(r.runs.map(x => `${x.startedAt.slice(5,16)} p=${x.prompts} w=${x.words} h=${x.helps} min=${x.minutes}`).join('\n'));
+console.log(r.steps.map(x => `${x.stepId}: ${x.level} attn=${x.needsAttention} changes=${x.changes.length}`).join('\n'));
+console.log(r.headline);
+console.log(r.steps.find(x=>x.stepId==='bag')!.changes.map(c=>c.reason).join('\n'));

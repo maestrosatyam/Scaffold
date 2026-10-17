@@ -1,0 +1,51 @@
+/* Scaffold design tokens — shared by the MCP Apps (device cards) and the simulator/coach UI.
+   Typeface: Atkinson Hyperlegible (Braille Institute, SIL OFL 1.1), chosen for low-vision legibility. */
+@import '@fontsource/atkinson-hyperlegible/400.css';
+@import '@fontsource/atkinson-hyperlegible/700.css';
+
+:root {
+  --font: 'Atkinson Hyperlegible', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+
+  /* Device (dark) surface — Echo Show-sized canvas 768x480 */
+  --dev-bg: #0b1b2b;
+  --dev-surface: #13283d;
+  --dev-surface-2: #1b3550;
+  --dev-line: #24435f;
+  --dev-text: #f4f7fa;
+  --dev-muted: #9fb3c8;
+
+  /* Brand */
+  --teal: #2ec4b6;
+  --teal-ink: #0e9f8e;
+  --amber: #ffb547;
+  --rose: #ff7a7a;
+  --green: #5bd08a;
+
+  /* Support ladder: more support = warmer, less support = cooler/greener */
+  --lvl-full: #ffb547;
+  --lvl-partial: #f3d36b;
+  --lvl-cue: #7fd1c7;
+  --lvl-independent: #5bd08a;
+
+  /* Coach (light) surface */
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --line: #e2e7ee;
+  --ink: #1b2733;
+  --ink-2: #4a5a6b;
+  --ink-3: #74859a;
+  --focus: #1a73e8;
+
+  --r-sm: 8px;
+  --r-md: 14px;
+  --r-lg: 22px;
+  --shadow: 0 1px 2px rgb(16 24 40 / 6%), 0 4px 16px rgb(16 24 40 / 8%);
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
