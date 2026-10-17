@@ -64,7 +64,7 @@ export function WordsChart({ points, height = 170 }: { points: WordsPoint[]; hei
           if (e.key === 'ArrowLeft') setHover((h) => Math.max(0, (h ?? points.length) - 1));
         }}
         onBlur={() => setHover(null)}
-        style={{ display: 'block', outline: 'none' }}
+        style={{ display: 'block' }}
       >
         {ticks.map((t) => (
           <g key={t}>

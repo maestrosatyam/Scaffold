@@ -65,8 +65,13 @@ if ((await store.load(DEMO_PERSON.personId)).length === 0) {
   console.log(`Seeded demo person "${DEMO_PERSON.personId}" with 21 days of synthetic history`);
 }
 
-const server = app.listen(port, host, () => {
+const server = app.listen(port, host);
+server.on('listening', () => {
   console.log(`Scaffold MCP server on http://${host}:${port}  (MCP: /mcp, store: ${store.kind}, tz: ${timeZone})`);
+});
+server.on('error', (err: NodeJS.ErrnoException) => {
+  console.error(err.code === 'EADDRINUSE' ? `Port ${port} is already in use. Set PORT=<free port> and try again.` : `Server failed to start: ${err.message}`);
+  process.exit(1);
 });
 const shutdown = async () => {
   server.close();

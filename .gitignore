@@ -9,3 +9,6 @@ playwright-report/
 .vite/
 coverage/
 build/
+
+# local runtime data (db, token secret)
+data/

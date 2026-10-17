@@ -20,7 +20,7 @@ Scaffold is a **self-hosted MCP server**. It uses **Streamable HTTP** and **MCP 
 - **Speech is deterministic.** The same state always produces byte-identical words. Many learners need this, and it keeps Scaffold within the Alexa+ 500 ms tool budget. Server p95 is single-digit milliseconds.
 
 ## Quick start (no keys, no cloud)
-Requires **Node.js ≥ 22.18**, which runs the TypeScript directly.
+Requires **Node.js ≥ 22.18** (see `.nvmrc`), which runs the TypeScript directly with no build step for the server. With an older Node, `npm ci` stops with an engines error.
 
 ```bash
 npm ci
@@ -42,8 +42,8 @@ Open http://127.0.0.1:8787 and say or type **"start my morning"**, then "done", 
 
 ```bash
 # MCP Inspector (CLI)
-npx @modelcontextprotocol/inspector --cli http://127.0.0.1:8787/mcp --transport http --method tools/list
-npx @modelcontextprotocol/inspector --cli http://127.0.0.1:8787/mcp --transport http \
+npx -y @modelcontextprotocol/inspector@2.11.0 --cli http://127.0.0.1:8787/mcp --transport http --method tools/list
+npx -y @modelcontextprotocol/inspector@2.11.0 --cli http://127.0.0.1:8787/mcp --transport http \
   --method tools/call --tool-name start_routine --tool-arg routine=morning
 
 # Any other MCP client that supports Streamable HTTP: point it at http://127.0.0.1:8787/mcp
