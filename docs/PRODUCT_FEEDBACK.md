@@ -83,7 +83,7 @@ Pages: overview, quickstart, client lifecycle, functional requirements, design g
 **What needs work.**
 - **Behind `serverless-http` on Lambda, `express.json()` leaves `req.body` as a Buffer.** The transport then rejects every message as "not a valid JSON-RPC message". We had to parse the Buffer and synthesize `rawHeaders`. A note in the Lambda docs, or tolerance for Buffer bodies, would save others hours.
 - **An empty `allowedHosts: []` silently rejects everything**, including health checks. We would expect it to be treated as "unset" or to warn.
-- **Version upgrades can break code silently.** While working on our OSS contribution, we found that the official v1→v2 codemod turns `tool(name, annotations, cb)` into a broken schema (fixed in our PR).
+- **Version upgrades can break code silently.** While working on our OSS contribution, we found that the official v1→v2 codemod turns `tool(name, annotations, cb)` into a broken schema (our fix is ready; PR not yet opened).
 
 **Onboarding.** Very fast. The migration guide and the split packages are clear. A working Streamable HTTP server took minutes.
 
