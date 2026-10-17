@@ -4,7 +4,7 @@ Format: ADR-NNN — title — date — status. Context / Decision / Consequences
 
 ## ADR-001 — Workspace layout — 2026-10-17 — Accepted
 Context: Two independent deliverables (primary entry, OSS contribution) must stay legally and historically separate.
-Decision: `<workspace>` is the coordination workspace. `primary-entry/` is its own git repository (the Devpost submission repo). Upstream OSS checkouts live under `oss-contribution/upstream/` (each with intact upstream history) and are never copied into the primary repo.
+Decision: The hackathon coordination workspace (outside this repo). `primary-entry/` is its own git repository (the Devpost submission repo). Upstream OSS checkouts live under `oss-contribution/upstream/` (each with intact upstream history) and are never copied into the primary repo.
 Consequences: The primary repo can be published publicly without leaking OSS work-in-progress or coordination notes; the coordination docs (research/, oss/) can optionally be published separately.
 
 ## ADR-002 — No dependency on a paid LLM for the headline demo — 2026-10-17 — Accepted

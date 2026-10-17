@@ -5,6 +5,7 @@ import { Header } from './components/Header.tsx';
 import { callFromView, dialogues, lastResult, lastTurn, ROOMS, roomStore, say, screens, setRoom, turns, type Room, type Source, type Turn } from './lib/assistant.ts';
 import { trace } from './lib/mcp.ts';
 import { locationStore, navigate } from './lib/nav.ts';
+import { applyRecordMode, recordModeFrom } from './lib/present.ts';
 import { eventsStore, resetDemo, sessionStore, startSession } from './lib/session.ts';
 import { useStore } from './lib/store.ts';
 import { setMuted, setSpeaker, type Speaker } from './lib/voice.ts';
@@ -67,6 +68,9 @@ const api: ScaffoldApi = {
   reset: () => resetDemo(),
 };
 (window as unknown as { scaffold: ScaffoldApi }).scaffold = api;
+
+// ?record=1: presentation mode for the demo video (set once; survives in-app navigation).
+applyRecordMode(document.documentElement, recordModeFrom(location.search));
 
 // ------------------------------------------------------------------ app shell
 

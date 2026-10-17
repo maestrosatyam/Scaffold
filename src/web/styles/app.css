@@ -556,3 +556,13 @@ details.stepdef[open] { padding-bottom: 10px; }
   .captions { min-height: 76px; padding: 10px 16px; }
   .cap-text { font-size: 17px; }
 }
+
+/* ------------------------------------------------------------------ presentation mode (?record=1, demo video) */
+/* The recording drives the page through window.scaffold: hide the input bar, enlarge live captions,
+   and keep a band free at the bottom of the stage for the video's narration subtitles. */
+html[data-record] .voicebar { display: none; }
+html[data-record] .stage { padding-bottom: 124px; }
+html[data-record] .cap-text { font-size: 21px; }
+html[data-record] .cap-text.silent { font-size: 19px; }
+html[data-record] .cap-label { font-size: 13px; }
+html[data-record], html[data-record] * { cursor: none !important; }

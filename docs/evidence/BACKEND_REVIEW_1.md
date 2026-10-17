@@ -79,3 +79,28 @@ Severity is judged for the stated deployment: a public Lambda Function URL for j
 - **`ui://` resources.** These serve fixed files keyed by a constant map, so there is no path traversal. `express.static` and `sendFile` use fixed roots. There are no outbound requests with user-controlled URLs, so there is no SSRF.
 - **Body and input bounds.** The JSON body limit is 100 kb. Routine text is bounded by zod (15 steps, 400/200/60 characters). The regexes in `validate.ts` and `findRoutine` are linear.
 - **Tool annotations.** They match behaviour, apart from N-5. `start_routine` is effectively idempotent: a repeat resumes the run.
+
+---
+
+## Resolution (2026-10-17 22:16 IST; re-verified at release)
+All 27 findings (R-01 to R-27) were fixed in commit `6ff1e5f`. Every test in `tests/review/` **passes now**. Where a fix changed the design, the test was adapted so its intent is kept:
+- **R-07 and R-10:** the in-memory `SandboxRegistry` was replaced by stateless HMAC sandbox tokens and a rate limiter that runs before any write. Demo clocks are now stored in each sandbox's own event stream. The cap and sweep tests now cover the limiter, token expiry, forged tokens and store expiry.
+- **R-08:** `/api/debug/events` now needs an explicit token. Learner tokens get coach free text redacted.
+- **R-19 and R-27:** the schema now rejects degenerate aliases and ids that start with a digit. The tests check that, and also check that the matcher and default selection stay safe if such data reaches the log another way.
+- **R-01 and R-04:** the Lambda tests send a bearer token, because public deployments now default to `SCAFFOLD_ANONYMOUS=none`.
+
+Of the N-items, these were also addressed:
+- N-2: SQLITE_BUSY now maps to ConcurrencyError.
+- N-3: tokens split on the first `=`.
+- N-5: setting a step to its current level keeps the streaks.
+- N-6: the progress wording is fixed.
+- N-7: "done" counts exclude skipped steps.
+- N-12: help followed by a skip counts as aided.
+
+Still open, and documented as Low:
+- N-1: non-atomic DynamoDB `replace`, used only for seeding.
+- N-4: the `since` parameter is a string.
+- N-8: stale runs stay `active`.
+- N-9: replay numbers runs as "days".
+- N-10: replay is deterministic only for a given TZ and ICU.
+- N-11: `/api/debug/metrics` and `/api/info` are unauthenticated.

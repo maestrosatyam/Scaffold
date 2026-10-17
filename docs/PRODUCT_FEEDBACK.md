@@ -16,7 +16,7 @@ Every tool, API and SDK we actually used gets the five rules questions below. We
 Pages: overview, quickstart, client lifecycle, functional requirements, design guide, authentication, local inspector.
 
 **What worked well.**
-- The functional requirements are unusually concrete and actionable. "Return stable IDs so tools can be chained" and "declare only parameters you honor" directly shaped our `step_done(run_id, step_id)` idempotency design.
+- The functional requirements are unusually concrete and actionable. The guidance to return stable IDs for chaining tools, and to declare only parameters you actually honor, directly shaped our `step_done(run_id, step_id)` idempotency design.
 - The split of responsibilities is clear: Alexa+ handles understanding and rendering, the server owns tools and data. That made "no LLM inside the server" an obvious, defensible architecture.
 
 **What needs work.**
@@ -97,6 +97,8 @@ Pages: overview, quickstart, client lifecycle, functional requirements, design g
 
 **What worked well.** The bridge proxies tools and resources automatically. Size-change notifications and host context work.
 
+**Onboarding.** We had a first card rendering inside our own host in under an hour, using the `app-bridge.examples` typings. A plain-HTML "minimal host" example would have made that faster.
+
 **What needs work.**
 - Bundling the View runtime adds about 225 KB per card. A smaller "view-only" entry would help constrained devices.
 - Playwright can't target elements inside a sandboxed srcdoc iframe by locator, so we fell back to coordinate clicks. A testing guide for hosts would help.
@@ -104,6 +106,10 @@ Pages: overview, quickstart, client lifecycle, functional requirements, design g
 **Would we build with it again?** **Yes.**
 
 ## 6. MCP Inspector CLI 2.11.0 and the MCP conformance suite 0.1.16 (used for evidence)
+**What we used them for.** Scripted protocol evidence against our server: `tools/list`, `tools/call`, `resources/list`, and the conformance `server` suite (see `docs/evidence/`).
+
+**Onboarding.** One `npx` command each, with no install or config. The Inspector worked the first time.
+
 **What worked well.** `--cli … --method tools/list|tools/call|resources/list` made scripted protocol evidence trivial.
 
 **What needs work.** The conformance `server` suite assumes the reference fixture tools (`test_simple_text`, …). Against a real product server, 24 of 30 scenarios fail by construction. A "product server" profile that only checks the transport, lifecycle, security and declared capabilities would make the results meaningful.
@@ -119,6 +125,8 @@ Pages: overview, quickstart, client lifecycle, functional requirements, design g
 - An MCP client design that mirrors the TypeScript SDK, which made the fix's semantics easy to align.
 
 **What needs work.** Optional extras make the full local test run noisy: failures from extras that aren't installed, plus mypy errors. A documented "core-only" test command would help outside contributors.
+
+**Onboarding.** `uv` plus an editable install got the MCP test subset running quickly. Working out which extras the full suite needs took longer.
 
 **Would we build with it again?** **Yes.**
 

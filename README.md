@@ -12,6 +12,12 @@ Scaffold is a **self-hosted MCP server**. It uses **Streamable HTTP** and **MCP 
 
 > **Honest boundary.** The Alexa+ developer toolkit is partner-only, so this repo includes a **simulated Alexa+ surface**: a web page that is a *real* MCP client and a *real* MCP Apps host. It is labelled "Simulated Alexa+ surface — not Amazon software" on every screen. It does not run on an Echo, and it is not affiliated with or certified by Amazon. All people and history in the demo are **synthetic**.
 
+![Simulated Echo Show: a step at full support after "help", with the live MCP trace](docs/screenshots/simulator-help.png)
+
+| Time machine (replayed from the event log) | Learner device + coach view |
+|---|---|
+| ![Time machine](docs/screenshots/time-machine.png) | ![Director view](docs/screenshots/director-split.png) |
+
 ## 60-second tour
 - **The routine gets quieter as the person learns.** On Day 1 the step is *"Step 1 of 6. Pick up the blue toothbrush. Squeeze a pea-sized bit of toothpaste…"*. On Day 10 it is *"Toothbrush and paste."* On Day 21 there is silence. Open **Time machine** to see this replayed from the event log.
 - **"Help" climbs one level, for that step only.** If help is needed two runs in a row, support is **added back** and the coach is told why. The reason reads like this: *"Added support back (cue to partial) because help was needed in 2 runs in a row (Oct 16, Oct 17)."*
