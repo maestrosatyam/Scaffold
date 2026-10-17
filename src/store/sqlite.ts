@@ -6,7 +6,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import type { NewEvent, ScaffoldEvent } from '../core/model.ts';
-import { ConcurrencyError, type EventStore } from './store.ts';
+import { ConcurrencyError, type EventStore, type ReplaceOptions } from './store.ts';
 
 export class SqliteStore implements EventStore {
   readonly kind = 'sqlite';
@@ -26,6 +26,10 @@ export class SqliteStore implements EventStore {
         body TEXT NOT NULL,
         PRIMARY KEY (person_id, seq)
       ) WITHOUT ROWID;
+      CREATE TABLE IF NOT EXISTS stream_expiry (
+        person_id TEXT PRIMARY KEY,
+        expires_at INTEGER NOT NULL
+      );
     `);
   }
 
@@ -44,7 +48,15 @@ export class SqliteStore implements EventStore {
   async append(personId: string, events: readonly NewEvent[], expectedLastSeq: number): Promise<ScaffoldEvent[]> {
     const insert = this.db.prepare('INSERT INTO events (person_id, seq, type, at, body) VALUES (?, ?, ?, ?, ?)');
     const stamped = events.map((e, i) => ({ ...e, seq: expectedLastSeq + i + 1 }) as ScaffoldEvent);
-    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      this.db.exec('BEGIN IMMEDIATE');
+    } catch (err) {
+      // Another process holds the write lock past busy_timeout: surface as a retryable conflict.
+      if (String(err).includes('SQLITE_BUSY') || String(err).includes('database is locked')) {
+        throw new ConcurrencyError(personId, expectedLastSeq, -1);
+      }
+      throw err;
+    }
     try {
       const last = this.lastSeq(personId);
       if (last !== expectedLastSeq) throw new ConcurrencyError(personId, expectedLastSeq, last);
@@ -61,11 +73,20 @@ export class SqliteStore implements EventStore {
     return stamped;
   }
 
-  async replace(personId: string, events: readonly ScaffoldEvent[]): Promise<void> {
+  async replace(personId: string, events: readonly ScaffoldEvent[], opts: ReplaceOptions = {}): Promise<void> {
     const insert = this.db.prepare('INSERT INTO events (person_id, seq, type, at, body) VALUES (?, ?, ?, ?, ?)');
     this.db.exec('BEGIN IMMEDIATE');
     try {
+      // Drop expired demo sandboxes.
+      const now = Date.now();
+      this.db.prepare('DELETE FROM events WHERE person_id IN (SELECT person_id FROM stream_expiry WHERE expires_at < ?)').run(now);
+      this.db.prepare('DELETE FROM stream_expiry WHERE expires_at < ?').run(now);
       this.db.prepare('DELETE FROM events WHERE person_id = ?').run(personId);
+      if (opts.expiresAtMs) {
+        this.db.prepare('INSERT OR REPLACE INTO stream_expiry (person_id, expires_at) VALUES (?, ?)').run(personId, opts.expiresAtMs);
+      } else {
+        this.db.prepare('DELETE FROM stream_expiry WHERE person_id = ?').run(personId);
+      }
       for (const e of events) insert.run(personId, e.seq, e.type, e.at, JSON.stringify(e));
       this.db.exec('COMMIT');
     } catch (err) {

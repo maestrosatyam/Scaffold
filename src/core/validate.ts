@@ -15,7 +15,7 @@ export interface Issue {
 export const StepDefSchema = z.object({
   id: z
     .string()
-    .regex(/^[a-z0-9][a-z0-9-]{0,31}$/, 'lowercase letters, digits and dashes')
+    .regex(/^[a-z][a-z0-9-]{0,31}$/, 'starts with a letter; lowercase letters, digits and dashes')
     .describe('Stable step id, e.g. "load-machine"'),
   title: z.string().min(1).max(40),
   pictogram: z.string().min(1).max(32).describe('Pictogram key, e.g. "toothbrush", "shirt", "washer"'),
@@ -34,9 +34,18 @@ export const PolicySchema = z.object({
 });
 
 export const RoutineDefSchema = z.object({
-  routineId: z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}$/),
+  routineId: z.string().regex(/^[a-z][a-z0-9-]{0,31}$/, 'starts with a letter; lowercase letters, digits and dashes'),
   name: z.string().min(1).max(40),
-  aliases: z.array(z.string().min(1).max(40)).max(8).default([]),
+  aliases: z
+    .array(
+      z
+        .string()
+        .min(1)
+        .max(40)
+        .refine((a) => a.toLowerCase().replace(/[^a-z0-9]/g, '').length >= 2, 'aliases need at least two letters or digits'),
+    )
+    .max(8)
+    .default([]),
   steps: z.array(StepDefSchema).min(1).max(15),
   policy: PolicySchema.default({ fadeAfter: 3, supportAfter: 2 }),
 });

@@ -9,6 +9,7 @@
 
 import {
   DEFAULT_POLICY,
+  dict,
   fadeOne,
   supportOne,
   statKey,
@@ -51,12 +52,15 @@ export function emptyState(personId: string): PersonState {
     personId,
     displayName: personId,
     coachIds: [],
-    routines: {},
-    proposals: {},
-    runs: {},
+    demoClock: null,
+    routineOrder: [],
+    recentCmds: [],
+    routines: dict(),
+    proposals: dict(),
+    runs: dict(),
     runOrder: [],
-    versions: {},
-    stats: {},
+    versions: dict(),
+    stats: dict(),
     audit: [],
     lastSeq: 0,
   };
@@ -107,9 +111,15 @@ export function applyOutcome(
   if (outcome === 'unaided') {
     if (stats.aidedStreak > 0) stats.aidedStreak = 0;
     if (stats.unaidedStreak === 0) stats.streakRunIds = [];
+    if (stats.level === 'independent') {
+      // Saturated: keep only the most recent evidence (bounded memory, meaningful counter).
+      stats.unaidedStreak = Math.min(stats.unaidedStreak + 1, policy.fadeAfter);
+      stats.streakRunIds = [...stats.streakRunIds, runId].slice(-policy.fadeAfter);
+      return null;
+    }
     stats.unaidedStreak += 1;
     stats.streakRunIds.push(runId);
-    if (stats.unaidedStreak >= policy.fadeAfter && stats.level !== 'independent') {
+    if (stats.unaidedStreak >= policy.fadeAfter) {
       const from = stats.level;
       const to = fadeOne(from);
       const change: LevelChange = {
@@ -132,9 +142,14 @@ export function applyOutcome(
   // aided
   if (stats.unaidedStreak > 0) stats.unaidedStreak = 0;
   if (stats.aidedStreak === 0) stats.streakRunIds = [];
+  if (stats.level === 'full') {
+    stats.aidedStreak = Math.min(stats.aidedStreak + 1, policy.supportAfter);
+    stats.streakRunIds = [...stats.streakRunIds, runId].slice(-policy.supportAfter);
+    return null;
+  }
   stats.aidedStreak += 1;
   stats.streakRunIds.push(runId);
-  if (stats.aidedStreak >= policy.supportAfter && stats.level !== 'full') {
+  if (stats.aidedStreak >= policy.supportAfter) {
     const from = stats.level;
     const to = supportOne(from);
     const change: LevelChange = {
@@ -160,22 +175,33 @@ export interface ProjectionOptions {
 }
 
 /** Applies one event to the state in place. Exposed for incremental projection. */
+export const RECENT_CMDS = 256;
+
 export function apply(state: PersonState, e: ScaffoldEvent, opts: ProjectionOptions): void {
+  // Idempotent projection: an event at or below the cursor was already applied (e.g. two
+  // overlapping catch-up reads); applying it again would double-count runs and outcomes.
+  if (e.seq <= state.lastSeq) return;
   const dayOf = (iso: string) => fmtDay(iso, opts.timeZone);
   state.lastSeq = e.seq;
+  if (e.cmd && state.recentCmds.at(-1) !== e.cmd) {
+    state.recentCmds.push(e.cmd);
+    if (state.recentCmds.length > RECENT_CMDS) state.recentCmds.shift();
+  }
   const audit = (what: string) => state.audit.push({ seq: e.seq, at: e.at, actorId: e.actorId, what });
   switch (e.type) {
     case 'person.registered': {
       state.displayName = e.displayName;
       state.coachIds = [...e.coachIds];
+      state.demoClock = e.demoClock ?? null;
       audit(`Registered ${e.displayName}; coaches with access: ${e.coachIds.join(', ') || 'none'}`);
       return;
     }
     case 'routine.published': {
       const r = e.routine;
-      const versions = (state.versions[r.routineId] ??= {});
+      const versions = (state.versions[r.routineId] ??= dict());
       versions[e.version] = r;
       const existing = state.routines[r.routineId];
+      if (!existing) state.routineOrder.push(r.routineId);
       state.routines[r.routineId] = {
         current: r,
         version: e.version,
@@ -211,8 +237,9 @@ export function apply(state: PersonState, e: ScaffoldEvent, opts: ProjectionOpti
       const def = routineVersion(state, e.routineId, e.version);
       const steps: StepRun[] = def.steps.map((s) => {
         const level = ensureStats(state, e.routineId, s.id).level;
-        return { stepId: s.id, baseLevel: level, level, helps: 0, status: 'pending' };
+        return { stepId: s.id, presented: false, baseLevel: level, level, helps: 0, status: 'pending' };
       });
+      if (steps[0]) steps[0].presented = true;
       const run: Run = {
         runId: e.runId,
         routineId: e.routineId,
@@ -222,7 +249,7 @@ export function apply(state: PersonState, e: ScaffoldEvent, opts: ProjectionOpti
         devices: [e.device],
         status: 'active',
         steps,
-        completionKeys: {},
+        completionKeys: dict(),
         seeded: !!e.seeded,
       };
       state.runs[e.runId] = run;
@@ -242,6 +269,7 @@ export function apply(state: PersonState, e: ScaffoldEvent, opts: ProjectionOpti
       step.completedAt = e.at;
       run.completionKeys[e.idempotencyKey] = e.stepId;
       run.lastActivityAt = e.at;
+      markCurrentPresented(run);
       const def = routineVersion(state, run.routineId, run.version);
       const stats = ensureStats(state, run.routineId, e.stepId);
       const change = applyOutcome(
@@ -261,10 +289,16 @@ export function apply(state: PersonState, e: ScaffoldEvent, opts: ProjectionOpti
     case 'step.skipped': {
       const { run, step } = locate(state, e.runId, e.stepId);
       step.status = 'skipped';
+      step.skipReason = e.reason;
       run.lastActivityAt = e.at;
-      // A skip is not evidence either way, but it does break an unaided streak.
-      const stats = ensureStats(state, run.routineId, e.stepId);
-      stats.unaidedStreak = 0;
+      markCurrentPresented(run);
+      // A plain skip is neutral: it neither advances nor resets progress toward fading.
+      // But asking for help and then skipping is evidence that support was needed.
+      if (step.helps > 0) {
+        const def = routineVersion(state, run.routineId, run.version);
+        const change = applyOutcome(ensureStats(state, run.routineId, e.stepId), def.policy ?? DEFAULT_POLICY, 'aided', run.runId, e.at, (id) => dayOf(state.runs[id]?.startedAt ?? e.at));
+        if (change) audit(`"${def.steps.find((s) => s.id === e.stepId)?.title ?? e.stepId}": ${change.reason}`);
+      }
       return;
     }
     case 'run.resumed': {
@@ -290,7 +324,11 @@ export function apply(state: PersonState, e: ScaffoldEvent, opts: ProjectionOpti
     }
     case 'level.set': {
       const stats = ensureStats(state, e.routineId, e.stepId);
-      if (stats.level !== e.level) {
+      if (stats.level === e.level) {
+        audit(`Confirmed level of ${e.stepId} at ${e.level}: ${e.reason}`);
+        return; // keep streaks: confirming the current level must not erase progress
+      }
+      {
         stats.changes.push({
           at: e.at,
           from: stats.level,
@@ -309,6 +347,11 @@ export function apply(state: PersonState, e: ScaffoldEvent, opts: ProjectionOpti
       return;
     }
   }
+}
+
+function markCurrentPresented(run: Run): void {
+  const next = run.steps.find((s) => s.status === 'pending');
+  if (next) next.presented = true;
 }
 
 function locate(state: PersonState, runId: string, stepId: string): { run: Run; step: StepRun } {
@@ -346,14 +389,14 @@ export function activeRun(state: PersonState, now: string, routineId?: string): 
 
 /** Resolve a spoken or typed routine reference ("morning", "my morning routine", id). */
 export function findRoutine(state: PersonState, ref: string | undefined): RoutineDef | undefined {
-  const all = Object.values(state.routines).map((r) => r.current);
+  const all = state.routineOrder.map((id) => state.routines[id]!.current);
   if (!ref) return all[0];
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
   const q = norm(ref).replace(/\b(my|the|routine)\b/g, '').trim();
   return (
     all.find((r) => r.routineId === ref) ??
     all.find((r) => norm(r.name) === q || r.aliases.some((a) => norm(a) === q)) ??
-    all.find((r) => q.length > 0 && (norm(r.name).includes(q) || r.aliases.some((a) => q.includes(norm(a)))))
+    all.find((r) => q.length > 0 && (norm(r.name).includes(q) || r.aliases.some((a) => norm(a).length >= 2 && q.includes(norm(a)))))
   );
 }
 
@@ -374,7 +417,7 @@ export function cmdStartRun(
 ): { events: NewEvent[]; runId: string; resumed: boolean } {
   const routine = findRoutine(state, args.routineRef);
   if (!routine) {
-    const names = Object.values(state.routines).map((r) => r.current.name);
+    const names = state.routineOrder.map((id) => state.routines[id]!.current.name);
     throw new DomainError(
       'not_found',
       names.length ? `I couldn't find that routine. You have: ${names.join(', ')}.` : 'There are no routines yet.',
@@ -558,7 +601,7 @@ export function cmdDecide(
     throw new DomainError('conflict', `That suggestion was already ${p.status}.`);
   }
   const current = state.routines[p.routine.routineId];
-  if (current && p.baseVersion !== current.version) {
+  if (args.decision === 'approved' && (current?.version ?? null) !== p.baseVersion) {
     throw new DomainError('conflict', 'The routine changed since this was suggested. Ask your coach to suggest it again.');
   }
   const events: NewEvent[] = [

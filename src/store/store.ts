@@ -14,19 +14,27 @@ export class ConcurrencyError extends Error {
   }
 }
 
+export interface ReplaceOptions {
+  expiresAtMs?: number;
+}
+
 export interface EventStore {
   readonly kind: string;
   /** Events with seq > afterSeq, in order. */
   load(personId: string, afterSeq?: number): Promise<ScaffoldEvent[]>;
   append(personId: string, events: readonly NewEvent[], expectedLastSeq: number): Promise<ScaffoldEvent[]>;
-  /** Replace a stream wholesale (demo reset / seeding only). */
-  replace(personId: string, events: readonly ScaffoldEvent[]): Promise<void>;
+  /**
+   * Replace a stream wholesale (demo seeding only). `expiresAtMs` marks a disposable demo
+   * sandbox: stores delete it after that time (DynamoDB TTL, or a sweep in local stores).
+   */
+  replace(personId: string, events: readonly ScaffoldEvent[], opts?: ReplaceOptions): Promise<void>;
   close?(): Promise<void>;
 }
 
 export class MemoryStore implements EventStore {
   readonly kind = 'memory';
   private streams = new Map<string, ScaffoldEvent[]>();
+  private expiry = new Map<string, number>();
 
   async load(personId: string, afterSeq = 0): Promise<ScaffoldEvent[]> {
     return (this.streams.get(personId) ?? []).filter((e) => e.seq > afterSeq).map((e) => structuredClone(e));
@@ -41,7 +49,16 @@ export class MemoryStore implements EventStore {
     return stamped.map((e) => structuredClone(e));
   }
 
-  async replace(personId: string, events: readonly ScaffoldEvent[]): Promise<void> {
+  async replace(personId: string, events: readonly ScaffoldEvent[], opts: ReplaceOptions = {}): Promise<void> {
+    const now = Date.now();
+    for (const [id, exp] of this.expiry) {
+      if (exp < now) {
+        this.streams.delete(id);
+        this.expiry.delete(id);
+      }
+    }
     this.streams.set(personId, events.map((e) => structuredClone(e)));
+    if (opts.expiresAtMs) this.expiry.set(personId, opts.expiresAtMs);
+    else this.expiry.delete(personId);
   }
 }

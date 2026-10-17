@@ -73,10 +73,21 @@ interface EventBase {
   actorId: string;
   /** Marks events produced by the demo seeder so reports can label them honestly. */
   seeded?: boolean;
+  /**
+   * Id of the command that produced this event. Lets a retry after an ambiguous commit
+   * (write succeeded, response lost) recognise its own events instead of applying twice.
+   */
+  cmd?: string;
+}
+
+/** Demo-only clock: wall time runs normally, offset so "now" started at a chosen local time. */
+export interface DemoClock {
+  anchorMs: number;
+  startedMs: number;
 }
 
 export type ScaffoldEvent =
-  | (EventBase & { type: 'person.registered'; personId: string; displayName: string; coachIds: string[] })
+  | (EventBase & { type: 'person.registered'; personId: string; displayName: string; coachIds: string[]; demoClock?: DemoClock })
   | (EventBase & { type: 'routine.published'; routine: RoutineDef; version: number; proposalId?: string })
   | (EventBase & {
       type: 'change.proposed';
@@ -106,6 +117,12 @@ export type EventType = ScaffoldEvent['type'];
 type DistributiveOmit<T, K extends keyof never> = T extends unknown ? Omit<T, K> : never;
 /** An event before the store has assigned it a sequence number. */
 export type NewEvent = DistributiveOmit<ScaffoldEvent, 'seq'>;
+
+/**
+ * A record with no prototype: user-controlled keys such as "constructor" or "__proto__" are plain
+ * keys here and can never reach Object.prototype or the global Object.
+ */
+export const dict = <T>(): Record<string, T> => Object.create(null) as Record<string, T>;
 
 // ---------------------------------------------------------------------------------------------
 // Projections (pure functions of the log; never persisted as truth)
@@ -140,6 +157,9 @@ export type StepRunStatus = 'pending' | 'done' | 'skipped';
 
 export interface StepRun {
   stepId: string;
+  /** True once the step has been the current step (so its prompt was actually given). */
+  presented: boolean;
+  skipReason?: 'late' | 'asked';
   /** The level the step was first presented at in this run (the person's baseline). */
   baseLevel: Level;
   /** Current level within this run, after any help requests. */
@@ -186,6 +206,11 @@ export interface PersonState {
   personId: string;
   displayName: string;
   coachIds: string[];
+  demoClock: DemoClock | null;
+  /** Routine ids in publish order (default routine = first). */
+  routineOrder: string[];
+  /** Recently applied command ids (bounded), for ambiguous-commit detection. */
+  recentCmds: string[];
   routines: Record<string, { current: RoutineDef; version: number; history: number[] }>;
   proposals: Record<string, Proposal>;
   runs: Record<string, Run>;

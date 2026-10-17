@@ -45,7 +45,7 @@ export function stepView(state: PersonState, run: Run, at?: number): StepView | 
     stepId: sd.id,
     index: idx + 1,
     total: run.steps.length,
-    doneCount: run.steps.filter((s) => s.status !== 'pending').length,
+    doneCount: run.steps.filter((s) => s.status === 'done').length,
     title: sd.title,
     pictogram: sd.pictogram,
     level: sr.level,
@@ -86,6 +86,8 @@ export function summarizeRun(state: PersonState, run: Run): RunSummary {
   for (const sr of run.steps) {
     const sd = def.steps.find((s) => s.id === sr.stepId)!;
     let level = sr.baseLevel;
+    // Steps dropped before they ever became current (e.g. running late) were never spoken.
+    if (!sr.presented) continue;
     if (level !== 'independent') {
       prompts += 1;
       words += wordCount(promptFor(sd, level));
@@ -176,7 +178,9 @@ export function independenceReport(state: PersonState, routineId: string, sinceI
     .map((s) => ({ stepId: s.stepId, title: s.title, reason: s.changes.at(-1)?.reason ?? 'Support was added back.' }));
   const parts: string[] = [];
   if (runs.length >= 2 && firstWords !== null && lastWords !== null) {
-    parts.push(`Spoken prompting fell from ${firstWords} words to ${lastWords} words per run over ${runs.length} runs.`);
+    if (lastWords < firstWords) parts.push(`Spoken prompting fell from ${firstWords} words to ${lastWords} words per run over ${runs.length} runs.`);
+    else if (lastWords > firstWords) parts.push(`Spoken prompting rose from ${firstWords} words to ${lastWords} words per run over ${runs.length} runs.`);
+    else parts.push(`Spoken prompting stayed at ${firstWords} words per run over ${runs.length} runs.`);
   }
   parts.push(`${independentSteps} of ${def.steps.length} steps are now done without prompts.`);
   if (attention.length) parts.push(`${attention.length} step${attention.length > 1 ? 's need' : ' needs'} attention: ${attention.map((a) => a.title).join(', ')}.`);

@@ -18,7 +18,7 @@ import {
   planForTime,
 } from '../core/engine.ts';
 import { levelIndex, type Actor, type LevelChange, type NewEvent, type PersonState, type RoutineDef, type Run } from '../core/model.ts';
-import { finishFacts, finishSpeech, helpSpeech, nextSpeech, repeatSpeech, resumeSpeech, startSpeech } from '../core/speech.ts';
+import { finishFacts, finishSpeech, helpSpeech, nextSpeech, repeatSpeech, resumeSpeech, startSpeech, stepLine } from '../core/speech.ts';
 import { RoutineDefSchema, validateRoutine } from '../core/validate.ts';
 import { independenceReport, stepView } from '../core/views.ts';
 import {
@@ -71,7 +71,17 @@ function fail(err: unknown): ToolResult {
   if (err instanceof DomainError) {
     return { isError: true, content: [{ type: 'text', text: err.message }] };
   }
-  throw err;
+  // Never leak internal error text to the person (or the assistant reading it aloud).
+  console.error('[scaffold] tool error:', err);
+  return { isError: true, content: [{ type: 'text', text: 'Sorry, something went wrong. Please try that again.' }] };
+}
+
+/** Explain why a step id from the client does not match the current step. */
+function stepMismatch(run: Run | undefined, stepId: string): DomainError {
+  const target = run?.steps.find((s) => s.stepId === stepId);
+  if (!target) return new DomainError('not_found', 'That step is not part of this routine.');
+  if (target.status === 'pending') return new DomainError('step_mismatch', "We haven't reached that step yet.");
+  return new DomainError('step_mismatch', 'That step is already finished.');
 }
 
 const titlesOf = (r: RoutineDef): Record<string, string> => Object.fromEntries(r.steps.map((s) => [s.id, s.title]));
@@ -117,7 +127,27 @@ function stepResult(
     duplicate: extra.duplicate ?? false,
     level_changes: extra.level_changes ?? [],
     skipped: extra.skipped ?? [],
+    summary:
+      run.status === 'finished'
+        ? (() => {
+            const f = finishFacts(state, run, titlesOf(state.versions[run.routineId]![run.version]!));
+            return { finished_at: f.finishedAt, on_own: f.unaided, total: f.total, faded: f.fadedTitles };
+          })()
+        : null,
   };
+}
+
+/** Field-by-field comparison (key order independent: parsed and literal steps order keys differently). */
+function sameStep(a: RoutineDef['steps'][number], b: RoutineDef['steps'][number]): boolean {
+  return (
+    a.title === b.title &&
+    a.pictogram === b.pictogram &&
+    a.must === b.must &&
+    a.estSec === b.estSec &&
+    a.prompts.full === b.prompts.full &&
+    a.prompts.partial === b.prompts.partial &&
+    a.prompts.cue === b.prompts.cue
+  );
 }
 
 function diffRoutines(prev: RoutineDef | undefined, next: RoutineDef) {
@@ -126,7 +156,7 @@ function diffRoutines(prev: RoutineDef | undefined, next: RoutineDef) {
   return {
     added: next.steps.filter((s) => !before.has(s.id)).map((s) => s.title),
     removed: (prev?.steps ?? []).filter((s) => !after.has(s.id)).map((s) => s.title),
-    changed: next.steps.filter((s) => before.has(s.id) && JSON.stringify(before.get(s.id)) !== JSON.stringify(s)).map((s) => s.title),
+    changed: next.steps.filter((s) => before.has(s.id) && !sameStep(before.get(s.id)!, s)).map((s) => s.title),
   };
 }
 
@@ -220,7 +250,8 @@ export function buildMcpServer(opts: BuildOptions): McpServer {
         const def = state.versions[run.routineId]![run.version]!;
         const level_changes = result.duplicate ? [] : changesSince(state, run, before);
         let speech: string;
-        if (run.status === 'finished') speech = finishSpeech(finishFacts(state, run, titlesOf(def)), tz);
+        if (run.status === 'abandoned') speech = `That ${def.name.toLowerCase()} was stopped earlier. Say "start my ${def.name.toLowerCase()}" to begin again.`;
+        else if (run.status === 'finished') speech = finishSpeech(finishFacts(state, run, titlesOf(def)), tz);
         else if (result.duplicate) speech = repeatSpeech(stepView(state, run)!);
         else speech = nextSpeech(stepView(state, run));
         return ok(stepResult(state, run, speech, { duplicate: result.duplicate, level_changes }));
@@ -242,7 +273,7 @@ export function buildMcpServer(opts: BuildOptions): McpServer {
       handle('need_help', async ({ run_id, step_id }: { run_id: string; step_id?: string }) => {
         const { result, state } = await exec((s, ctx) => {
           const r = cmdHelp(s, ctx, { runId: run_id });
-          if (step_id && r.stepId !== step_id) throw new DomainError('step_mismatch', 'That step is already finished.');
+          if (step_id && r.stepId !== step_id) throw stepMismatch(s.runs[run_id], step_id);
           return { events: r.events, result: r };
         });
         const run = state.runs[run_id]!;
@@ -299,7 +330,7 @@ export function buildMcpServer(opts: BuildOptions): McpServer {
       {
         title: 'Replan for the time left',
         description:
-          'The person is running late ("I only have 10 minutes"). Keeps every must-do step, keeps optional steps only if they fit, and skips the rest for today. Skipped steps do not count against the person.',
+          'The person is running late ("I only have 10 minutes"). Keeps every must-do step, keeps optional steps only if they fit, and skips the rest for today. Skipped steps are neutral: they neither count for nor against progress.',
         inputSchema: z.object({ ...RunRef, minutes_left: z.number().min(0).max(240).describe('Minutes until the person must be done') }),
         outputSchema: StepResultOut,
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -319,7 +350,7 @@ export function buildMcpServer(opts: BuildOptions): McpServer {
         const v = stepView(state, run);
         const keepTitles = result.keep.map((k) => k.title.toLowerCase());
         let speech = skipped.length
-          ? `Okay. Today we'll skip ${skipped.map((t) => t.toLowerCase()).join(' and ')}.`
+          ? `Okay. To fit your time, today we'll leave out: ${skipped.map((t) => t.toLowerCase()).join(' and ')}.`
           : `Okay. You have time for everything left.`;
         if (keepTitles.length && skipped.length) speech += ` Still to do: ${keepTitles.join(', ')}.`;
         if (result.overBySec > 0) speech += ` The must-do steps usually take about ${Math.ceil(result.fitsSec / 60)} minutes.`;
@@ -336,7 +367,7 @@ export function buildMcpServer(opts: BuildOptions): McpServer {
       'skip_step',
       {
         title: 'Skip the current step today',
-        description: 'Skip the current step for today only ("skip", "not today"). Does not change support levels.',
+        description: 'Skip the current step for today only ("skip", "not today"). A plain skip does not change support levels; if help was already asked for on this step, it counts as a run that needed help.',
         inputSchema: z.object({ ...RunRef, step_id: z.string().optional() }),
         outputSchema: StepResultOut,
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -347,7 +378,7 @@ export function buildMcpServer(opts: BuildOptions): McpServer {
         const { state } = await exec((s, ctx) => {
           const run = s.runs[run_id];
           const cur = run?.steps.find((x) => x.status === 'pending');
-          if (step_id && cur && cur.stepId !== step_id) throw new DomainError('step_mismatch', 'That step is already finished.');
+          if (step_id && cur && cur.stepId !== step_id) throw stepMismatch(run, step_id);
           if (run && cur) title = s.versions[run.routineId]![run.version]!.steps.find((d) => d.id === cur.stepId)!.title;
           return { events: cmdSkip(s, ctx, { runId: run_id, reason: 'asked' }), result: null };
         });
@@ -357,7 +388,7 @@ export function buildMcpServer(opts: BuildOptions): McpServer {
         const speech =
           run.status === 'finished'
             ? finishSpeech(finishFacts(state, run, titlesOf(def)), tz)
-            : `Okay, skipping ${title.toLowerCase()} today. ${nextSpeech(v)}`.trim();
+            : [`Okay, skipping ${title.toLowerCase()} today.`, v ? stepLine(v) : ''].filter(Boolean).join(' ');
         return ok(stepResult(state, run, speech, { skipped: title ? [title] : [] }));
       }),
     );
@@ -410,7 +441,7 @@ export function buildMcpServer(opts: BuildOptions): McpServer {
         const speech =
           decision === 'approved'
             ? `Done. ${p.routine.name} is ready. Say "start ${p.routine.name.toLowerCase()}" when you want to try it.`
-            : `Okay, I won't add it. I'll let ${p.proposedBy.split(' (')[0]} know you said not now.`;
+            : `Okay, I won't add it. ${p.proposedBy.split(' (')[0]} will see that you said not now.`;
         return ok({ speech, proposal_id, decision, routine_name: p.routine.name, published_version: published });
       }),
     );
@@ -435,7 +466,7 @@ export function buildMcpServer(opts: BuildOptions): McpServer {
         const finished = state.runOrder.filter((id) => state.runs[id]!.routineId === r.routineId && state.runs[id]!.status === 'finished').length;
         const speech = own.length
           ? `You do ${own.length} of ${steps.length} steps of your ${r.name.toLowerCase()} on your own now: ${own.map((s) => s.title.toLowerCase()).join(', ')}.`
-          : `You're learning your ${r.name.toLowerCase()}. Every time you do a step without help, I'll need to say less.`;
+          : `You're learning your ${r.name.toLowerCase()}. When you do a step without help a few times in a row, I'll say less for it.`;
         return ok({ speech, routine_name: r.name, independent_steps: own.length, total_steps: steps.length, runs_finished: finished, steps });
       }),
     );
@@ -453,8 +484,8 @@ export function buildMcpServer(opts: BuildOptions): McpServer {
     },
     handle('list_routines', async () => {
       const state = await service.state(pid);
-      const now = service.now(pid).toISOString();
-      const routines = Object.values(state.routines).map(({ current, version }) => ({
+      const now = service.nowFor(state).toISOString();
+      const routines = state.routineOrder.map((id) => state.routines[id]!).map(({ current, version }) => ({
         routine_id: current.routineId,
         name: current.name,
         version,

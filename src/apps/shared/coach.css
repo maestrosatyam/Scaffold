@@ -1,0 +1,146 @@
+/* Coach look (report): light by default, follows the host theme. Contrast-checked against
+   WCAG AA: body text ≥ 7:1, secondary ≥ 4.5:1, marks ≥ 3:1 on their surface. */
+
+:root {
+  color-scheme: light;
+  --c-bg: #f6f7f9;
+  --c-surface: #ffffff;
+  --c-surface-2: #f1f4f7;
+  --c-line: #e2e7ee;
+  --c-grid: #e9edf2;
+  --c-ink: #1b2733;
+  --c-ink-2: #44546a;
+  --c-ink-3: #5c6c80;
+  --c-accent: #0e9f8e;
+  --c-accent-text: #0a7a6d;
+  --c-accent-wash: rgb(14 159 142 / 10%);
+  --c-track: #e3e9ef;
+  --c-good: #1d7f47;
+  --c-good-wash: #e7f6ed;
+  --c-warn-ink: #7a4800;
+  --c-warn-line: #f0a531;
+  --c-warn-wash: #fff6e5;
+  --c-hatch: #c9d3dd;
+  --c-tile: #eef3f6;
+  --c-shadow: 0 1px 2px rgb(16 24 40 / 5%), 0 2px 10px rgb(16 24 40 / 5%);
+  --pg-ink: #10243a;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --c-bg: #0b1b2b;
+  --c-surface: #13283d;
+  --c-surface-2: #172f47;
+  --c-line: #24435f;
+  --c-grid: #1f3a54;
+  --c-ink: #f4f7fa;
+  --c-ink-2: #c9d6e2;
+  --c-ink-3: #a3b6ca;
+  --c-accent: #2ec4b6;
+  --c-accent-text: #5fd8cc;
+  --c-accent-wash: rgb(46 196 182 / 14%);
+  --c-track: #24435f;
+  --c-good: #6ad99a;
+  --c-good-wash: rgb(91 208 138 / 12%);
+  --c-warn-ink: #ffd28a;
+  --c-warn-line: #ffb547;
+  --c-warn-wash: rgb(255 181 71 / 10%);
+  --c-hatch: #2f5272;
+  --c-tile: #f4f7fa;
+  --c-shadow: none;
+}
+
+html,
+body {
+  background: var(--c-bg);
+  color: var(--c-ink);
+}
+
+body {
+  font-size: 15px;
+}
+
+.page {
+  max-width: 768px;
+  margin: 0 auto;
+  padding: calc(24px + var(--safe-top, 0px)) 24px calc(28px + var(--safe-bottom, 0px));
+}
+
+.card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-md);
+  box-shadow: var(--c-shadow);
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-ink-3);
+}
+
+.eyebrow .mark {
+  width: 18px;
+  height: 18px;
+}
+
+.section-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--c-ink);
+}
+
+.muted {
+  color: var(--c-ink-3);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px 3px 7px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.badge .ic {
+  font-size: 14px;
+}
+
+.badge.warn {
+  color: var(--c-warn-ink);
+  background: var(--c-warn-wash);
+  box-shadow: inset 0 0 0 1px var(--c-warn-line);
+}
+
+.badge.good {
+  color: var(--c-good);
+  background: var(--c-good-wash);
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+:root[data-theme='dark'] :focus-visible {
+  outline-color: #8ab4f8;
+}
+
+.tile-sm {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  padding: 6px;
+  border-radius: 12px;
+  background: var(--c-tile);
+}

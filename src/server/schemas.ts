@@ -54,6 +54,15 @@ export const StepResultOut = z.object({
   duplicate: z.boolean().describe('True when this exact request was already applied (safe retry)'),
   level_changes: z.array(LevelChangeOut).describe('Support-level changes caused by this call'),
   skipped: z.array(z.string()).describe('Titles of steps skipped by this call'),
+  summary: z
+    .object({
+      finished_at: z.string(),
+      on_own: z.number().int().describe('Steps done with no prompt and no help'),
+      total: z.number().int(),
+      faded: z.array(z.string()).describe('Titles of steps that will get fewer prompts from now on'),
+    })
+    .nullable()
+    .describe('Present when the routine just finished'),
 });
 
 export const RoutinesOut = z.object({

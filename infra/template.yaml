@@ -14,7 +14,12 @@ Parameters:
     Type: String
     NoEcho: true
     Default: ''
-    Description: Optional SCAFFOLD_TOKENS (token=personId:role:actorId,...). Empty = built-in demo tokens.
+    Description: Optional static SCAFFOLD_TOKENS (token=personId:role:actorId,...). Empty = no static tokens; judges use demo sandboxes (POST /api/demo/sandbox).
+  TokenSecret:
+    Type: String
+    NoEcho: true
+    MinLength: 32
+    Description: HMAC secret for stateless demo-sandbox tokens (e.g. output of `openssl rand -hex 32`). Shared by all instances.
   TimeZone:
     Type: String
     Default: America/Los_Angeles
@@ -38,6 +43,7 @@ Resources:
         - { AttributeName: pk, KeyType: HASH }
         - { AttributeName: seq, KeyType: RANGE }
       SSESpecification: { SSEEnabled: true }
+      TimeToLiveSpecification: { AttributeName: ttl, Enabled: true }
 
   ScaffoldFunction:
     Type: AWS::Serverless::Function
@@ -51,6 +57,9 @@ Resources:
       Environment:
         Variables:
           NODE_OPTIONS: --enable-source-maps
+          NODE_ENV: production
+          SCAFFOLD_ANONYMOUS: none
+          SCAFFOLD_TOKEN_SECRET: !Ref TokenSecret
           SCAFFOLD_STORE: dynamodb
           SCAFFOLD_TABLE: !Ref EventsTable
           SCAFFOLD_TZ: !Ref TimeZone

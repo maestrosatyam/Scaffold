@@ -6,6 +6,7 @@
 // add-on would use account linking (OAuth 2.1 authorization_code + PKCE) and map the linked
 // account to the same Actor shape; see architecture/DECISIONS.md.
 
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { Actor } from '../core/model.ts';
 import { DEMO_COACH, DEMO_PERSON } from '../demo/seed.ts';
 
@@ -35,9 +36,12 @@ const DEMO_COACH_ACTOR: Actor = {
  */
 export function authFromEnv(env: NodeJS.ProcessEnv): AuthConfig {
   const tokens = new Map<string, Actor>();
+  // Unset -> built-in local demo tokens. Empty string -> no static tokens (use demo sandboxes).
   const spec = env.SCAFFOLD_TOKENS ?? 'demo-learner=sam:learner:sam,demo-coach=sam:coach:priya';
   for (const entry of spec.split(',').map((s) => s.trim()).filter(Boolean)) {
-    const [token, rest] = entry.split('=');
+    const eq = entry.indexOf('=');
+    const token = eq > 0 ? entry.slice(0, eq) : '';
+    const rest = eq > 0 ? entry.slice(eq + 1) : '';
     const [personId, role, actorId] = (rest ?? '').split(':');
     if (!token || !personId || (role !== 'learner' && role !== 'coach') || !actorId) {
       throw new Error(`Bad SCAFFOLD_TOKENS entry: ${entry.replace(/^[^=]*/, '<token>')}`);
@@ -54,63 +58,98 @@ export type AuthResult = { ok: true; actor: Actor } | { ok: false; status: 401; 
 export function authenticate(
   cfg: AuthConfig,
   authorization: string | null | undefined,
-  sandboxes?: SandboxRegistry,
+  sandboxes?: SandboxTokens,
   nowMs = Date.now(),
+  opts: { allowAnonymous?: boolean } = {},
 ): AuthResult {
   if (!authorization) {
+    if (opts.allowAnonymous === false) return { ok: false, status: 401, message: 'Missing bearer token' };
     return cfg.anonymous ? { ok: true, actor: cfg.anonymous } : { ok: false, status: 401, message: 'Missing bearer token' };
   }
-  const m = /^Bearer\s+(.+)$/i.exec(authorization.trim());
-  const token = m?.[1]?.trim();
-  const actor = token ? (cfg.tokens.get(token) ?? sandboxes?.lookup(token, nowMs)) : undefined;
+  const m = /^Bearer\s+(\S+)\s*$/i.exec(authorization.trim());
+  const token = m?.[1];
+  const actor = token ? (cfg.tokens.get(token) ?? sandboxes?.verify(token, nowMs)) : undefined;
   if (!actor) return { ok: false, status: 401, message: 'Invalid bearer token' };
   return { ok: true, actor };
 }
 
 /**
- * Short-lived demo sandboxes: each browser visitor gets their own seeded person and a pair of
- * random learner/coach tokens, so concurrent judges never see each other's state.
+ * Stateless demo-sandbox tokens: `sbx.<claims>.<hmac>` where claims = {p: personId, r: role, e: expiry}.
+ * Any instance holding the same secret can verify them, so sandboxes survive Lambda scale-out and
+ * recycling (nothing about a sandbox lives in process memory; its data lives in the store).
  */
-export class SandboxRegistry {
-  private sessions = new Map<string, { actor: Actor; expires: number }>();
-  private readonly ttlMs: number;
-  private readonly max: number;
+export class SandboxTokens {
+  private readonly secret: Buffer;
+  readonly ttlMs: number;
 
-  constructor(ttlMs = 6 * 60 * 60 * 1000, max = 500) {
+  constructor(secret: string | Buffer, ttlMs = 6 * 60 * 60 * 1000) {
+    this.secret = Buffer.isBuffer(secret) ? secret : Buffer.from(secret, 'utf8');
+    if (this.secret.length < 16) throw new Error('Sandbox token secret must be at least 16 bytes');
     this.ttlMs = ttlMs;
-    this.max = max;
   }
 
-  create(personId: string, nowMs: number, token: () => string): { learnerToken: string; coachToken: string } {
-    this.sweep(nowMs);
-    if (this.sessions.size >= this.max * 2) throw new Error('Too many demo sandboxes; try again later');
-    const learnerToken = token();
-    const coachToken = token();
-    const expires = nowMs + this.ttlMs;
-    this.sessions.set(learnerToken, { actor: { ...DEMO_LEARNER, personId, actorId: personId }, expires });
-    this.sessions.set(coachToken, { actor: { ...DEMO_COACH_ACTOR, personId }, expires });
-    return { learnerToken, coachToken };
+  private sign(body: string): string {
+    return createHmac('sha256', this.secret).update(body).digest('base64url');
   }
 
-  lookup(token: string, nowMs: number): Actor | undefined {
-    const s = this.sessions.get(token);
-    if (!s) return undefined;
-    if (s.expires < nowMs) {
-      this.sessions.delete(token);
+  issue(personId: string, role: 'learner' | 'coach', nowMs: number): string {
+    const body = Buffer.from(JSON.stringify({ p: personId, r: role, e: nowMs + this.ttlMs })).toString('base64url');
+    return `sbx.${body}.${this.sign(body)}`;
+  }
+
+  issuePair(personId: string, nowMs: number): { learnerToken: string; coachToken: string; expiresAt: number } {
+    return { learnerToken: this.issue(personId, 'learner', nowMs), coachToken: this.issue(personId, 'coach', nowMs), expiresAt: nowMs + this.ttlMs };
+  }
+
+  verify(token: string, nowMs: number): Actor | undefined {
+    const parts = token.split('.');
+    if (parts.length !== 3 || parts[0] !== 'sbx') return undefined;
+    const [, body, mac] = parts as [string, string, string];
+    const want = Buffer.from(this.sign(body));
+    const got = Buffer.from(mac);
+    if (want.length !== got.length || !timingSafeEqual(want, got)) return undefined;
+    let claims: { p?: unknown; r?: unknown; e?: unknown };
+    try {
+      claims = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
+    } catch {
       return undefined;
     }
-    return s.actor;
+    if (typeof claims.p !== 'string' || !/^sam-[a-f0-9]{8,32}$/.test(claims.p)) return undefined;
+    if (typeof claims.e !== 'number' || claims.e < nowMs) return undefined;
+    if (claims.r === 'learner') return { ...DEMO_LEARNER, personId: claims.p, actorId: claims.p };
+    if (claims.r === 'coach') return { ...DEMO_COACH_ACTOR, personId: claims.p };
+    return undefined;
+  }
+}
+
+/** Fixed-window limiter for unauthenticated sandbox creation (per client key and per instance). */
+export class RateLimiter {
+  private hits = new Map<string, { windowStart: number; n: number }>();
+  private readonly perKey: number;
+  private readonly total: number;
+  private readonly windowMs: number;
+
+  constructor(perKey = 20, total = 300, windowMs = 60 * 60 * 1000) {
+    this.perKey = perKey;
+    this.total = total;
+    this.windowMs = windowMs;
   }
 
-  /** Person ids whose sandboxes have expired (so callers can drop their streams). */
-  sweep(nowMs: number): string[] {
-    const dead: string[] = [];
-    for (const [t, s] of this.sessions) {
-      if (s.expires < nowMs) {
-        this.sessions.delete(t);
-        dead.push(s.actor.personId);
-      }
-    }
-    return dead;
+  /** Returns true and records a hit if allowed. Nothing is recorded when refused. */
+  take(key: string, nowMs: number): boolean {
+    const bump = (k: string, limit: number): (() => void) | null => {
+      const h = this.hits.get(k);
+      const fresh = !h || nowMs - h.windowStart >= this.windowMs;
+      const n = fresh ? 0 : h!.n;
+      if (n >= limit) return null;
+      return () => this.hits.set(k, { windowStart: fresh ? nowMs : h!.windowStart, n: n + 1 });
+    };
+    const a = bump(`k:${key}`, this.perKey);
+    const b = bump('*', this.total);
+    if (!a || !b) return false;
+    a();
+    b();
+    if (this.hits.size > 10_000) this.hits.clear();
+    return true;
   }
 }

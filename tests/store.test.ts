@@ -88,9 +88,13 @@ describe('DynamoDB store (AWS SDK v3, mocked client — no AWS account used)', (
     const out = await store.append('sam', [ev('a'), ev('b')], 7);
     expect(out.map((e) => e.seq)).toEqual([8, 9]);
     const input = ddb.commandCalls(TransactWriteItemsCommand)[0]!.args[0].input;
-    expect(input.TransactItems).toHaveLength(2);
-    expect(input.TransactItems![0]!.Put!.ConditionExpression).toBe('attribute_not_exists(pk)');
-    expect(input.TransactItems![1]!.Put!.Item!.seq).toEqual({ N: '9' });
+    // ConditionCheck proves seq 7 is the tail; then two conditional Puts claim 8 and 9.
+    expect(input.TransactItems).toHaveLength(3);
+    expect(input.TransactItems![0]!.ConditionCheck!.Key).toEqual({ pk: { S: 'sam' }, seq: { N: '7' } });
+    expect(input.TransactItems![0]!.ConditionCheck!.ConditionExpression).toBe('attribute_exists(pk)');
+    expect(input.TransactItems![1]!.Put!.ConditionExpression).toBe('attribute_not_exists(pk)');
+    expect(input.TransactItems![2]!.Put!.Item!.seq).toEqual({ N: '9' });
+    expect(input.ClientRequestToken).toMatch(/^[0-9a-f]{36}$/);
   });
 
   it('maps a cancelled transaction (seq already taken) to ConcurrencyError', async () => {

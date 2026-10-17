@@ -1,5 +1,7 @@
 // Entry point: `node src/server/main.ts` (Node >= 22.18 runs TypeScript directly).
-import { resolve } from 'node:path';
+import { randomBytes } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { packageRoot } from './root.ts';
 import { buildSeedEvents, localYmd, DEMO_PERSON } from '../demo/seed.ts';
 import { MemoryStore, type EventStore } from '../store/store.ts';
@@ -24,7 +26,22 @@ async function openStore(): Promise<EventStore> {
 const host = env.HOST ?? '127.0.0.1';
 const port = Number(env.PORT ?? 8787);
 const timeZone = env.SCAFFOLD_TZ ?? 'America/Los_Angeles';
-const list = (v: string | undefined) => v?.split(',').map((s) => s.trim()).filter(Boolean);
+/** Comma list -> array; empty or unset -> undefined (an empty allowlist would reject everything). */
+const list = (v: string | undefined) => {
+  const items = v?.split(',').map((s) => s.trim()).filter(Boolean) ?? [];
+  return items.length ? items : undefined;
+};
+
+/** Local token secret: env, else persisted under data/ so sandbox tokens survive restarts. */
+function tokenSecret(): string {
+  if (env.SCAFFOLD_TOKEN_SECRET) return env.SCAFFOLD_TOKEN_SECRET;
+  const file = resolve(root, 'data/.token-secret');
+  if (existsSync(file)) return readFileSync(file, 'utf8').trim();
+  mkdirSync(dirname(file), { recursive: true });
+  const secret = randomBytes(32).toString('hex');
+  writeFileSync(file, secret, { mode: 0o600 });
+  return secret;
+}
 
 const store = await openStore();
 const { app } = createApp({
@@ -35,6 +52,7 @@ const { app } = createApp({
   auth: authFromEnv(env),
   demo: env.SCAFFOLD_DEMO !== '0',
   demoStartTime: env.SCAFFOLD_DEMO_START === 'real' ? null : (env.SCAFFOLD_DEMO_START ?? '07:24'),
+  tokenSecret: tokenSecret(),
   allowedHosts: list(env.ALLOWED_HOSTS),
   allowedOrigins: list(env.ALLOWED_ORIGINS),
   webDir: resolve(root, 'dist/web'),

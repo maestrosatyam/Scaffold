@@ -222,6 +222,8 @@ export interface SeedOptions {
   timeZone: string;
   /** Stream to seed; defaults to the shared demo person. Sandboxes use their own id. */
   personId?: string;
+  /** Demo clock stored in the stream itself (so every server instance agrees on "now"). */
+  demoClock?: { anchorMs: number; startedMs: number };
 }
 
 /**
@@ -240,7 +242,15 @@ export function buildSeedEvents(opts: SeedOptions): ScaffoldEvent[] {
   };
   const day0 = addDays(opts.today, -(SEED_DAYS + 1)); // last seeded day = yesterday
   const setupAt = new Date(zonedToUtc(day0, 18, 0, opts.timeZone)).toISOString();
-  push({ type: 'person.registered', personId, displayName: DEMO_PERSON.displayName, coachIds: [DEMO_COACH.coachId], at: setupAt, actorId: personId });
+  push({
+    type: 'person.registered',
+    personId,
+    displayName: DEMO_PERSON.displayName,
+    coachIds: [DEMO_COACH.coachId],
+    ...(opts.demoClock ? { demoClock: opts.demoClock } : {}),
+    at: setupAt,
+    actorId: personId,
+  });
   push({ type: 'routine.published', routine: MORNING, version: 1, at: setupAt, actorId: personId });
 
   let counter = 0;
