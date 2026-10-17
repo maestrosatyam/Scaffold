@@ -1,0 +1,44 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Okay, morning routine. I'm here if you need me."
+    }
+  ],
+  "structuredContent": {
+    "speech": "Okay, morning routine. I'm here if you need me.",
+    "run": {
+      "run_id": "run-c257af7267",
+      "routine_id": "morning",
+      "routine_name": "Morning routine",
+      "status": "active",
+      "done": 0,
+      "total": 6,
+      "started_at": "2026-10-17T16:09:14.536Z",
+      "finished_at": null,
+      "devices": [
+        "kitchen"
+      ]
+    },
+    "step": {
+      "run_id": "run-c257af7267",
+      "routine_id": "morning",
+      "routine_name": "Morning routine",
+      "step_id": "teeth",
+      "index": 1,
+      "total": 6,
+      "done_count": 0,
+      "title": "Brush teeth",
+      "pictogram": "toothbrush",
+      "level": "independent",
+      "base_level": "independent",
+      "prompt": "",
+      "must": true,
+      "est_sec": 150,
+      "is_last": false
+    },
+    "duplicate": false,
+    "level_changes": [],
+    "skipped": []
+  }
+}

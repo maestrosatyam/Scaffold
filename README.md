@@ -86,7 +86,7 @@ The code lives in `src/core` (pure domain), `src/store`, `src/server` (MCP + HTT
 ```bash
 npm test              # unit + property + store contract + MCP-over-HTTP + adversarial-review + web router tests
 npm run typecheck
-npm run test:e2e      # browser end-to-end (see evidence/TEST_RUNS.md for the runner used)
+npm run test:e2e      # browser end-to-end (Playwright with the cached Chromium; results in docs/evidence/TEST_RUNS.md)
 ```
 
 ## Deploy to AWS (optional, near-zero cost)

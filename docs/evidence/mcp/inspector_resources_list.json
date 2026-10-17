@@ -1,0 +1,28 @@
+{
+  "resources": [
+    {
+      "name": "Step card",
+      "uri": "ui://scaffold/step-card.html",
+      "description": "Step card",
+      "mimeType": "text/html;profile=mcp-app"
+    },
+    {
+      "name": "Independence report",
+      "uri": "ui://scaffold/independence-report.html",
+      "description": "Independence report",
+      "mimeType": "text/html;profile=mcp-app"
+    },
+    {
+      "name": "Suggestion review",
+      "uri": "ui://scaffold/suggestions.html",
+      "description": "Suggestion review",
+      "mimeType": "text/html;profile=mcp-app"
+    },
+    {
+      "name": "My progress",
+      "uri": "ui://scaffold/progress.html",
+      "description": "My progress",
+      "mimeType": "text/html;profile=mcp-app"
+    }
+  ]
+}
