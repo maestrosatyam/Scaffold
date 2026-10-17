@@ -1,0 +1,103 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Scaffold - self-hosted MCP server (Streamable HTTP, MCP 2025-11-25) for an Alexa+ routine coach.
+  One Lambda (Function URL) serves /mcp, the demo API and the simulator; DynamoDB holds the event log.
+  Designed for free-tier / near-zero cost. Tear down with: sam delete --stack-name <name>
+
+Parameters:
+  AllowedHosts:
+    Type: String
+    Default: ''
+    Description: Comma-separated Host header allowlist (set to the Function URL hostname after first deploy).
+  Tokens:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: Optional SCAFFOLD_TOKENS (token=personId:role:actorId,...). Empty = built-in demo tokens.
+  TimeZone:
+    Type: String
+    Default: America/Los_Angeles
+  BudgetEmail:
+    Type: String
+    Default: ''
+    Description: If set, creates a USD 5/month AWS Budget that emails at 80% of actual spend.
+
+Conditions:
+  HasBudget: !Not [!Equals [!Ref BudgetEmail, '']]
+
+Resources:
+  EventsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: pk, AttributeType: S }
+        - { AttributeName: seq, AttributeType: N }
+      KeySchema:
+        - { AttributeName: pk, KeyType: HASH }
+        - { AttributeName: seq, KeyType: RANGE }
+      SSESpecification: { SSEEnabled: true }
+
+  ScaffoldFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../build/lambda
+      Handler: dist/server-js/server/lambda.handler
+      Runtime: nodejs22.x
+      Architectures: [arm64]
+      MemorySize: 512
+      Timeout: 10
+      Environment:
+        Variables:
+          NODE_OPTIONS: --enable-source-maps
+          SCAFFOLD_STORE: dynamodb
+          SCAFFOLD_TABLE: !Ref EventsTable
+          SCAFFOLD_TZ: !Ref TimeZone
+          ALLOWED_HOSTS: !Ref AllowedHosts
+          SCAFFOLD_TOKENS: !Ref Tokens
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref EventsTable }
+      FunctionUrlConfig:
+        AuthType: NONE
+      LoggingConfig:
+        LogGroup: !Ref FunctionLogs
+
+  FunctionLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 14
+
+  ErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Scaffold Lambda errors (judging-period uptime watch)
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions: [{ Name: FunctionName, Value: !Ref ScaffoldFunction }]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  CostBudget:
+    Type: AWS::Budgets::Budget
+    Condition: HasBudget
+    Properties:
+      Budget:
+        BudgetName: !Sub '${AWS::StackName}-monthly'
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit: { Amount: 5, Unit: USD }
+      NotificationsWithSubscribers:
+        - Notification: { NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 80, ThresholdType: PERCENTAGE }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref BudgetEmail }]
+
+Outputs:
+  FunctionUrl:
+    Description: Public base URL (MCP endpoint is <url>mcp)
+    Value: !GetAtt ScaffoldFunctionUrl.FunctionUrl
+  EventsTableName:
+    Value: !Ref EventsTable

@@ -1,13 +1,13 @@
 // Entry point: `node src/server/main.ts` (Node >= 22.18 runs TypeScript directly).
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
+import { packageRoot } from './root.ts';
 import { buildSeedEvents, localYmd, DEMO_PERSON } from '../demo/seed.ts';
 import { MemoryStore, type EventStore } from '../store/store.ts';
 import { authFromEnv } from './auth.ts';
 import { createApp } from './app.ts';
 import { realClock } from './service.ts';
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const root = packageRoot();
 const env = process.env;
 
 async function openStore(): Promise<EventStore> {
