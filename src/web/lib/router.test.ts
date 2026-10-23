@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fallbackSpeech, initialDialogue, nextState, optionsFor, parse, parseMinutes, route, type DialogueState, type Plan } from './router.ts';
+import { fallbackSpeech, initialDialogue, nextState, optionsFor, parse, parseMinutes, route, socialSpeech, type DialogueState, type Plan } from './router.ts';
 
 const idle = initialDialogue('bedroom');
 const inRun: DialogueState = { ...idle, runId: 'run-1', stepId: 'bag' };
@@ -69,6 +69,39 @@ describe('parse: intents', () => {
     ['hold on', 'wait'],
     ['what is the weather', 'unknown'],
     ['', 'unknown'],
+    // Everyday ways of saying the same commands
+    ['I washed my face', 'done'],
+    ["I've brushed my teeth", 'done'],
+    ['I took my pills', 'done'],
+    ['got it', 'done'],
+    ["that's it", 'done'],
+    ["where's my bag?", 'help'],
+    ["I can't find my keys", 'help'],
+    ['this is too hard', 'help'],
+    ['remind me', 'help'],
+    ['huh?', 'repeat'],
+    ['sorry?', 'repeat'],
+    ["I didn't catch that", 'repeat'],
+    ['louder please', 'repeat'],
+    // Off-script speech gets a reply, never a tool call
+    ['can you hear me?', 'social'],
+    ['Are you there?', 'social'],
+    ['is this working', 'social'],
+    ['hello', 'social'],
+    ['hi there', 'social'],
+    ['good morning', 'social'],
+    ['thank you', 'social'],
+    ['who are you', 'social'],
+    ['what can you do?', 'social'],
+    ['stop', 'social'],
+    ['never mind', 'social'],
+    ['bye', 'social'],
+    ["I'm tired", 'social'],
+    ["I don't want to", 'social'],
+    ['sun rahe ho?', 'social'],
+    // ...but a command inside a polite sentence still wins
+    ['thanks, done', 'done'],
+    ['hi, start my morning', 'start'],
   ];
   it.each(cases)('%j -> %s', (u, kind) => {
     expect(parse(u).kind).toBe(kind);
@@ -194,6 +227,25 @@ describe('route: tool calls chained with dialogue state', () => {
       }
     }
     expect(fallbackSpeech(inRun)).toBe("Sorry, I didn't catch that. You can say: done, help, say that again, I'm running late, 10 minutes, or skip.");
+  });
+
+  it('off-script speech gets a short local reply that points back to the routine', () => {
+    for (const u of ['can you hear me', 'hello', 'who are you', 'thank you', "I'm tired"]) {
+      for (const st of [idle, inRun]) {
+        const p = route(u, st);
+        expect(p.type).toBe('reply');
+        if (p.type === 'reply') expect(p.speech).not.toMatch(/didn't catch/);
+      }
+    }
+    expect(socialSpeech('hear', inRun)).toBe('Yes, I can hear you. Say done when this step is finished, or help if you want a reminder.');
+    expect(socialSpeech('hear', idle)).toBe('Yes, I can hear you. Say start my morning when you are ready.');
+    expect(socialSpeech('stop', inRun)).toMatch(/paused here. Say where was I to carry on/);
+  });
+
+  it('a plain "yes" during a run is acknowledged without marking the step done', () => {
+    const p = route('yes', inRun);
+    expect(p.type).toBe('reply');
+    if (p.type === 'reply') expect(p.speech).toMatch(/Say done when this step is finished/);
   });
 
   it('chips are context-aware', () => {

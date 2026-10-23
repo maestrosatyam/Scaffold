@@ -3,7 +3,7 @@
 | Check | Result |
 |---|---|
 | Typecheck (server + web) | ✅ exit 0 |
-| Vitest: unit, property, store contracts (memory/SQLite/mocked DynamoDB), MCP over real HTTP, adversarial-review regressions, web router and presentation | ✅ **180 / 180** passed (10 files; 2026-10-23, after R-21, the everyday routines and the mic messages) |
+| Vitest: unit, property, store contracts (memory/SQLite/mocked DynamoDB), MCP over real HTTP, adversarial-review regressions, web router and presentation | ✅ **212 / 212** passed (10 files; 2026-10-23 23:14 IST, final) |
 | Build (MCP Apps single-file cards + web) | ✅ exit 0 |
 | Playwright e2e (cached Chromium): headline flow incl. tap inside the sandboxed MCP App, coach report, consent flow, time machine, "simulated" label + a11y on every page | ✅ **11 / 11** passed locally |
 | **The same e2e suite against the live AWS deployment** (`E2E_BASE_URL=https://tjncr2jv6v7sqw6jw467fbdyha0pesly.lambda-url.ap-southeast-2.on.aws`) | ✅ **11 / 11** passed (41.8 s, 2026-10-23 21:50 IST, final deploy); see `aws/DEPLOYMENT.md` |

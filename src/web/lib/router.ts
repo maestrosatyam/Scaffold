@@ -21,7 +21,11 @@ export type Intent =
   | { kind: 'list' }
   | { kind: 'wait' }
   | { kind: 'number'; value: number }
+  | { kind: 'social'; topic: SocialTopic }
   | { kind: 'unknown' };
+
+/** Off-script speech that gets a short local reply and a way back to the routine (no tool call). */
+export type SocialTopic = 'hear' | 'greet' | 'thanks' | 'who' | 'capabilities' | 'feeling' | 'stop' | 'bye' | 'praise';
 
 export type IntentKind = Intent['kind'];
 
@@ -111,6 +115,23 @@ export function parseMinutes(input: string): number | null {
 
 const has = (t: string, re: RegExp) => re.test(t);
 
+/** Whole-utterance social phrases: "thanks, done" is still "done". */
+const SOCIAL_WHOLE: [SocialTopic, RegExp][] = [
+  ['stop', /^(stop|cancel|pause|quit|exit|never ?mind|forget it|be quiet|quiet|stop talking|band karo|bas karo|chup)( please| now| it)?$/],
+  ['greet', /^(hi+|hello|hey|hey there|hi there|hello there|good (morning|afternoon|evening)|namaste|namaskar|(hi|hey|hello) (scaffold|alexa)|alexa)$/],
+  ['thanks', /^((ok|okay|great) )?(thanks|thank you|thank u|thanks a lot|thank you so much|cheers|shukriya|dhanyavaad|dhanyavad)( (scaffold|alexa))?$/],
+  ['bye', /^(bye|goodbye|good bye|bye bye|see you|see ya|good night|goodnight|talk later|that'?s all|that is all|i'?m off|alvida)$/],
+  ['praise', /^(good job|well done|nice|great|awesome|cool|perfect|you'?re (great|good|helpful|the best))$/],
+];
+/** Phrases that are never a routine command, wherever they appear. */
+const SOCIAL_ANY: [SocialTopic, RegExp][] = [
+  ['hear', /\b(can (you|u) hear me|do you hear me|are you (there|listening|awake|on)|you there|anyone there|is (this|it) (working|on)|testing|mic check|sun rahe ho|sun raha hai|sunai de raha)\b/],
+  ['who', /\b(who are you|what are you|what'?s your name|what is your name|are you alexa|are you a (robot|person|human)|tum kaun ho|aap kaun ho)\b/],
+  ['capabilities', /\b(what can you do|what do you do|how does this work|what can i say|what should i say|how do i use (this|you)|what are my options)\b/],
+];
+/** Feelings and refusals, checked after the commands but before a bare "no". */
+const FEELING = /\b(i'?m (so )?(tired|sad|upset|bored|anxious|worried|scared|sick|not feeling well|feeling bad)|i (feel|am feeling) (tired|sad|bad|sick|upset|unwell)|i don'?t want to|i do not want to|i give up|thak gaya|thak gayi|mann nahi)\b/;
+
 const RE = {
   allDone: /\b(all done|all finished|i'?m all done|everything'?s? done|everything is done|done with everything|finished everything|done everything|sab ho gaya|sab ho gya|sab hogaya|sab kar liya|sab khatam|sab done)\b/,
   late: /\b(late|running behind|behind schedule|in a hurry|hurry|rushing|short on time|no time|der ho|der hai|jaldi)\b/,
@@ -120,10 +141,10 @@ const RE = {
   suggestions: /\b(any suggestions?|suggestions?|suggested|what did (priya|my coach|the coach|coach) (suggest|say|send)|any changes|anything new|new routines?|koi suggestion|koi sujhav|sujhav)\b/,
   list: /\b(list (all )?(my )?routines|what routines|which routines|my routines|routines do i have|show (me )?(my )?routines|what can i do|routines)\b/,
   wait: /\b(not (done|finished|yet)|wait|hold on|hang on|one (sec|second|moment)|give me a (minute|sec|second|moment)|ruko|ruk jao|nahi hua|abhi nahi hua)\b/,
-  help: /\b(help|stuck|what do i do|what should i do|what am i supposed to|how do i|i don'?t know|don'?t understand|confused|not sure|lost|madad|help karo|samajh nahi|kya karna hai|kya karu|kya karoon|kya karun)\b/,
-  done: /\b(done|finished|finish|next|did it|i did|completed|complete|ho gaya|ho gya|hogaya|hogya|ho gayi|kar liya|kar diya|ho chuka|khatam|next step)\b/,
+  help: /\b(help|stuck|what do i do|what should i do|what am i supposed to|how do i|i don'?t know|don'?t understand|confused|not sure|lost|can'?t do (this|it)|i can'?t find|can'?t find|where is|where'?s (my|the)|i forgot|forgot (what|how|where)|what goes|too hard|so hard|difficult|show me|remind me|explain|madad|help karo|samajh nahi|kya karna hai|kya karu|kya karoon|kya karun)\b/,
+  done: /\b(done|finished|finish|next|did it|i did|completed|complete|got it|that'?s it|all set|ho gaya|ho gya|hogaya|hogya|ho gayi|kar liya|kar diya|ho chuka|khatam|next step)\b|\b(i'?ve|i have|i)( just| already)? (brushed|washed|dressed|got dressed|eaten|ate|had|packed|locked|took|taken|made|put|poured|walked|tapped|texted|opened|closed|got on)\b/,
   whatsNext: /\b(what'?s next|what is next|what now|what next|ab kya|aage kya)\b/,
-  repeat: /\b(say (that|it) again|repeat|again|one more time|what did you say|pardon|come again|didn'?t hear|phir se|fir se|phirse|firse|dobara|kya bola|kya kaha)\b/,
+  repeat: /\b(say (that|it) again|say again|repeat|again|one more time|what did you say|pardon|come again|didn'?t hear|didn'?t (get|catch) (that|it)|louder|slower|more slowly|phir se|fir se|phirse|firse|dobara|kya bola|kya kaha)\b|^(what|huh|sorry|eh|hmm+|hm+)$/,
   skip: /\b(skip|not today|leave it|chhod do|chod do|chhodo|rehne do|rahne do)\b/,
   start: /\b(start|begin|let'?s do|lets do|let'?s start|lets start|let'?s get|lets get|let'?s make|lets make|time for|time to|do my|i want to do|i want to start|take my|make my|catch the|shuru)\b/,
   yes: /^(yes|yeah|yep|yup|ya|sure|ok|okay|please|please do|go ahead|add it|approve|approved|sounds good|haan|han|haa|ha|haan ji|ha ji|ji|ji haan|theek hai|thik hai|accha|achha)\b|\b(yes|approve it|add it|go ahead)\b/,
@@ -143,6 +164,8 @@ function routineRef(t: string): string | undefined {
 export function parse(utterance: string): Intent {
   const t = normalize(utterance);
   if (!t) return { kind: 'unknown' };
+  for (const [topic, re] of SOCIAL_WHOLE) if (re.test(t)) return { kind: 'social', topic };
+  for (const [topic, re] of SOCIAL_ANY) if (re.test(t)) return { kind: 'social', topic };
   if (has(t, RE.allDone)) return { kind: 'all_done' };
   if (has(t, RE.late)) return { kind: 'late', minutes: parseMinutes(t) };
   const mins = parseMinutes(t);
@@ -158,6 +181,7 @@ export function parse(utterance: string): Intent {
   if (has(t, RE.skip)) return { kind: 'skip' };
   if (has(t, RE.start)) return { kind: 'start', routine: routineRef(t) };
   if (has(t, RE.list)) return { kind: 'list' };
+  if (FEELING.test(t)) return { kind: 'social', topic: 'feeling' };
   if (has(t, RE.no)) return { kind: 'no' };
   if (has(t, RE.yes)) return { kind: 'yes' };
   if (mins !== null && t.split(' ').length <= 3) return { kind: 'number', value: mins };
@@ -190,6 +214,34 @@ export function fallbackSpeech(s: DialogueState): string {
 }
 
 const NO_RUN = "You don't have a routine going right now. You can say: start my morning, or where was I?";
+
+/** Short, fixed replies for off-script speech; each ends with a way back to the routine. */
+export function socialSpeech(topic: SocialTopic, s: DialogueState): string {
+  const inRun = s.runId !== null;
+  const back = inRun ? "Say done when this step is finished, or help if you want a reminder." : 'Say start my morning when you are ready.';
+  switch (topic) {
+    case 'hear':
+      return `Yes, I can hear you. ${back}`;
+    case 'greet':
+      return inRun ? `Hi! We're in the middle of your routine. ${back}` : `Hi! You can say: ${spokenList(optionsFor(s).slice(0, 3))}.`;
+    case 'thanks':
+      return inRun ? `You're welcome. ${back}` : "You're welcome.";
+    case 'praise':
+      return inRun ? `Thanks! ${back}` : 'Thanks!';
+    case 'who':
+      return `I'm Scaffold, your routine coach. I take you through your routines one step at a time, and I say less as you learn them. ${back}`;
+    case 'capabilities':
+      return `I help with your routines, one step at a time. You can say: ${spokenList(optionsFor(s))}.`;
+    case 'feeling':
+      return inRun
+        ? "That's okay. We can go slowly. Say help for more support, or skip to leave this step for today. You can also ask your support worker."
+        : "That's okay. We can start whenever you are ready. You can also ask your support worker.";
+    case 'stop':
+      return inRun ? "Okay, I'll stop. Your routine is paused here. Say where was I to carry on." : 'Okay.';
+    case 'bye':
+      return inRun ? 'Bye for now. Your routine is paused. Say where was I to carry on.' : 'Bye for now.';
+  }
+}
 
 export function route(utterance: string, s: DialogueState): Plan {
   let intent = parse(utterance);
@@ -233,7 +285,10 @@ export function route(utterance: string, s: DialogueState): Plan {
     case 'list':
       return call('list_routines', {});
     case 'yes':
-      return s.proposalId ? call('decide_suggestion', { proposal_id: s.proposalId, decision: 'approved' }) : reply(fallbackSpeech(s));
+      if (s.proposalId) return call('decide_suggestion', { proposal_id: s.proposalId, decision: 'approved' });
+      return s.runId ? reply("Okay. Say done when this step is finished, or help if you want a reminder.") : reply(fallbackSpeech(s));
+    case 'social':
+      return reply(socialSpeech(intent.topic, s), intent.topic === 'stop' || intent.topic === 'bye' ? (s.runId ? ['where was I?', 'done', 'help'] : IDLE_OPTIONS) : optionsFor(s));
     case 'no':
       return s.proposalId ? call('decide_suggestion', { proposal_id: s.proposalId, decision: 'declined' }) : s.runId ? reply("Okay. Say done when you're ready.") : reply('Okay.');
     case 'wait':
