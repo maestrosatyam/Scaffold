@@ -1,0 +1,26 @@
+# Research basis for the routines and the fading method
+
+Scaffold teaches routines by **task analysis** (one routine broken into steps), with spoken **prompts at levels**: full, then short, then a cue, then silence. Those prompts **fade** as each step is learned. The everyday routines in the demo were chosen where published work says adults with intellectual disability (ID) or brain injury most often need help.
+- Morning routine.
+- **Lunch routine** (a cold meal: no stove, no sharp knife).
+- **Medicine routine** (a pill box at a fixed time of day, with "tell your support worker" when something is wrong).
+- **Bus routine** (getting to the stop and onto the right bus).
+
+Each source below was opened and its quote checked word for word on 2026-10-23. Quotes are short excerpts, with attribution.
+
+| Source | What it found | Short quote | Used for |
+|---|---|---|---|
+| Delgado-Lobete L, Montes-Montes R, Freire C, Ferradás MDM (2021). Performance of (instrumental) activities of daily living and physical capacity in Spanish adults with intellectual disabilities. *Healthcare* 9(4):435. [doi:10.3390/healthcare9040435](https://doi.org/10.3390/healthcare9040435) | All 20 adults with ID were limited in at least one household task. Meal preparation, money, laundry and shopping were the hardest: 90–100% needed help or did not do them. | "none of the participant were able to prepare a complete meal" [sic] | **Lunch routine**, the existing **Laundry** suggestion |
+| Spassiani NA, Higgins A, Tait S, et al. (2025). Did I take my medication today? Understanding medication self-management for adults with intellectual disabilities through participatory research. *J Appl Res Intellect Disabil* 38(3):e70059. [doi:10.1111/jar.70059](https://doi.org/10.1111/jar.70059) | Adults with ID named forgetting doses as a barrier. They named daily routines, reminders and pill boxes or blister packs as facilitators. | "routines and reminders, and formal and informal supports were highlighted as facilitators" | **Medicine routine**: pill box, fixed time, tell a supporter |
+| Wilson BA, Emslie HC, Quirk K, Evans JJ (2001). Reducing everyday memory and planning problems by means of a paging system: a randomised control crossover study. *J Neurol Neurosurg Psychiatry* 70(4):477–482. [doi:10.1136/jnnp.70.4.477](https://doi.org/10.1136/jnnp.70.4.477) | In a randomised crossover trial (n = 143, mostly brain injury or stroke), timed prompts improved everyday task completion for over 80% of those who completed it. For most, the gains held 7 weeks after the pager was returned. | "such as self care, self medication, and keeping appointments" | Spoken prompts for **medicine**, **self-care** and **getting out on time** (brain injury) |
+| Klavina A, Pérez-Fuster P, Daems J, et al. (2024). The use of assistive technology to promote practical skills in persons with autism spectrum disorder and intellectual disabilities: a systematic review. *Digital Health* 10. [doi:10.1177/20552076241281260](https://doi.org/10.1177/20552076241281260) | In 18 studies, app-based and video prompting improved daily-living skills. These included walking routes, public transport, shopping and cleaning. | "Video prompting is an effective technology for teaching new skills" | **Bus routine**, technology prompting in general |
+| Stierle J, Ryan JB, Katsiyannis A, et al. (2023). Using smart phone technology to improve daily living skills for individuals with intellectual disabilities. *J Appl Res Intellect Disabil* 36(5):1169–1178. [doi:10.1111/jar.13139](https://doi.org/10.1111/jar.13139) | Young adults with ID learned multistep recipes from a task-analysis phone app with prompts. Gains were large and dependence on others fell (n = 3). | "video prompting made a substantial difference in the safety of participants" | **Lunch routine**: task analysis on a device |
+| Wehmeyer ML, Tassé MJ, Davies DK, Stock S (2012). Support needs of adults with intellectual disability across domains: the role of technology. *J Spec Educ Technol* 27(2):11–22. [PMC4192661](https://pmc.ncbi.nlm.nih.gov/articles/PMC4192661/) | On the Supports Intensity Scale, health and safety support needs were proportionally high. Audio-prompting devices increased independent task completion. | "Health and safety was generally higher, proportionally, across groups." | **Medicine routine**; audio (voice) prompting |
+| Cowan LS, Lerman DC, Berdeaux KL, et al. (2023). A decision-making tool for evaluating and selecting prompting strategies. *Behav Anal Pract* 16(2):459–474. [doi:10.1007/s40617-022-00722-8](https://doi.org/10.1007/s40617-022-00722-8) | It summarises evidence that prompting and prompt-fading procedures teach people with IDD, and that prompts must be faded so the person responds independently. | "the instructor must fade any prompt that is added to aid the client" | The **fading ladder** itself (full → short → cue → silence) |
+
+**Limits of this evidence (stated plainly).**
+- Most intervention studies are small single-case designs.
+- Wilson et al. (2001) is a randomised trial, but in brain injury rather than ID.
+- Cowan et al. is a practitioner tool that summarises the literature.
+- No practitioner has reviewed Scaffold's specific prompt wording yet.
+- Scaffold makes no clinical claims, and its medicine routine gives no dosing advice.

@@ -15,6 +15,8 @@ The Alexa+ developer toolkit is open only to partners, so this repo includes a s
 ## Try it live
 https://tjncr2jv6v7sqw6jw467fbdyha0pesly.lambda-url.ap-southeast-2.on.aws/ needs no sign-in, no keys and no install.
 - It opens the simulated Echo Show. Say or type "start my morning".
+- Three newer routines start at full prompts: "take my medicine", "let's make lunch" and "catch the bus".
+- The mic uses the browser's speech service, which works in Chrome, Edge and Safari. Plain Chromium builds have none, so type instead.
 - Each browser session gets its own seeded sandbox.
 - It runs on AWS Lambda and DynamoDB in Sydney and stays up through the judging period.
 - The MCP endpoint is the same address followed by `/mcp`. To get a token, see [Use it from any MCP client](#use-it-from-any-mcp-client).
@@ -30,6 +32,7 @@ https://tjncr2jv6v7sqw6jw467fbdyha0pesly.lambda-url.ap-southeast-2.on.aws/ needs
 - **"Help" adds one level of support, for that step only.** If help is needed two runs in a row, support is added back and the coach is told why: *"Added support back (cue to partial) because help was needed in 2 runs in a row (Oct 16, Oct 17)."*
 - **"Where was I?"** resumes the same run on another device, so the person can move from the bedroom to the kitchen.
 - **The learner owns their routines.** A coach can only suggest a routine, and it takes effect only when the learner says "yes".
+- **The routines come from the research.** The demo covers mornings, a cold lunch, a pill-box medicine routine and catching the bus. Published studies name these as the daily tasks where adults with intellectual disability or brain injury most often need support, and say that task analysis with faded prompts teaches them. Sources, quotes and limits are in [docs/RESEARCH_BASIS.md](docs/RESEARCH_BASIS.md).
 - **The words are always the same.** The same state always produces exactly the same words, which many learners need. With no LLM in the server, tool calls stay well inside the Alexa+ 500 ms budget; server p95 is in single-digit milliseconds.
 
 ## Quick start (no keys, no cloud)

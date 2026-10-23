@@ -16,6 +16,9 @@ describe('parse: intents', () => {
     ['Start my morning routine.', 'start'],
     ["let's get ready", 'start'],
     ['start laundry', 'start'],
+    ['take my medicine', 'start'],
+    ["let's make lunch", 'start'],
+    ['catch the bus', 'start'],
     ['done', 'done'],
     ["I'm done", 'done'],
     ['finished', 'done'],
@@ -123,6 +126,8 @@ describe('route: tool calls chained with dialogue state', () => {
   it('start passes routine and device', () => {
     expect(callOf(route('start my morning', idle))).toEqual({ tool: 'start_routine', args: { routine: 'morning', device: 'bedroom' } });
     expect(callOf(route('start', { ...idle, device: 'kitchen' }))).toEqual({ tool: 'start_routine', args: { device: 'kitchen' } });
+    expect(callOf(route('take my medicine', idle))).toEqual({ tool: 'start_routine', args: { routine: 'take medicine', device: 'bedroom' } });
+    expect(callOf(route('catch the bus', idle))).toEqual({ tool: 'start_routine', args: { routine: 'catch bus', device: 'bedroom' } });
   });
 
   it('done / all done / help / skip carry run_id and step_id', () => {

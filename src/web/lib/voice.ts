@@ -156,6 +156,28 @@ function recognitionCtor(): RecognitionCtor | null {
 
 export const recognitionSupported = (): boolean => typeof window !== 'undefined' && recognitionCtor() !== null;
 
+/**
+ * What to tell the person when recognition fails, or null to stay quiet. Chromium-based browsers send
+ * the audio to the vendor's online speech service; builds without it (plain Chromium, many Linux
+ * packages) fail every attempt with "network".
+ */
+export function recognitionErrorMessage(code: string): string | null {
+  switch (code) {
+    case 'aborted':
+    case 'no-speech':
+      return null;
+    case 'not-allowed':
+      return 'Microphone permission was denied.';
+    case 'network':
+    case 'service-not-allowed':
+      return "This browser can't reach a speech service (plain Chromium builds have none). Use Chrome, Edge or Safari for the mic, or type instead.";
+    case 'audio-capture':
+      return 'No microphone was found. Type instead.';
+    default:
+      return `Speech recognition error: ${code}. Type instead.`;
+  }
+}
+
 let active: InstanceType<RecognitionCtor> | null = null;
 
 /** Listen for one utterance. Calls onFinal with the transcript; returns a stop function. */
@@ -184,7 +206,8 @@ export function listen(onFinal: (text: string) => void, onError?: (msg: string) 
     voiceState.set((s) => ({ ...s, interim: (final + ' ' + interim).trim() }));
   };
   rec.onerror = (e) => {
-    if (e.error !== 'aborted' && e.error !== 'no-speech') onError?.(e.error === 'not-allowed' ? 'Microphone permission was denied.' : `Speech recognition error: ${e.error}`);
+    const msg = recognitionErrorMessage(e.error);
+    if (msg) onError?.(msg);
   };
   rec.onend = () => {
     if (active === rec) active = null;

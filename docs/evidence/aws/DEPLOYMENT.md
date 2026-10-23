@@ -24,12 +24,13 @@ Deployed **2026-10-23 at about 20:45 IST** with `scripts/deploy-aws.sh`, which u
 | `GET /healthz` | `200 {"ok":true,"store":"dynamodb","protocol":"2025-11-25"}` |
 | `GET /` (simulator) | `200 text/html` |
 | `POST /mcp` `initialize` with no token | `401 {"error":{"code":-32001,"message":"Missing bearer token"}}`, as designed: the public URL never hands out a shared learner |
-| `POST /api/demo/sandbox` | a private sandbox seeded with 194 events (21 days of synthetic history), demo clock |
+| `POST /api/demo/sandbox` | a private sandbox seeded with 197 events: 21 days of synthetic morning history plus the three everyday routines. Demo clock |
 | `initialize` with the sandbox learner token | `protocolVersion` `2025-11-25`, server `scaffold` |
 | `tools/list` | 11 learner tools |
 | `tools/call start_routine {routine:"morning"}` | `"Okay, morning routine. I'm here if you need me."`, step `teeth` |
 | MCP Inspector CLI 2.11.0 `--header "Authorization: Bearer …" --method tools/list` | the tool list |
-| **Playwright e2e suite (11 tests) with `E2E_BASE_URL=<live URL>`** | **11 passed (38.1 s)** |
+| **Playwright e2e suite (11 tests) with `E2E_BASE_URL=<live URL>`** | **11 passed** (38.1 s after the header fix; 41.8 s on the final deploy, 21:50 IST) |
+| `start_routine` with "take medicine" / "make lunch" / "catch bus" | each new routine starts at full: *"Let's do your medicine routine. Step 1 of 5. …"* |
 
 ## The cost cap, tested live
 1. Invoked `BudgetGuardFunction` with a simulated SNS budget alert. It returned `{"throttled":"scaffold-adh2026-ScaffoldFunction-…"}`.

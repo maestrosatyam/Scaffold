@@ -93,6 +93,232 @@ export const MORNING: RoutineDef = {
   ],
 };
 
+/**
+ * Everyday routines published at setup, with no history yet, so every step starts at the full
+ * prompt. They cover the daily-living tasks where adults with intellectual disabilities most often
+ * need support (meals, medicines, getting about); sources in docs/RESEARCH_BASIS.md.
+ */
+export const LUNCH: RoutineDef = {
+  routineId: 'lunch',
+  name: 'Lunch routine',
+  aliases: ['lunch', 'make lunch', 'my lunch', 'sandwich', 'khana'],
+  policy: DEFAULT_POLICY,
+  steps: [
+    {
+      id: 'hands',
+      title: 'Wash hands',
+      pictogram: 'step',
+      must: true,
+      estSec: 40,
+      prompts: {
+        full: 'Go to the kitchen sink. Wet your hands, rub on soap for twenty seconds, rinse, and dry them on the towel.',
+        partial: 'Wash and dry your hands at the kitchen sink.',
+        cue: 'Wash hands.',
+      },
+    },
+    {
+      id: 'bread',
+      title: 'Bread on a plate',
+      pictogram: 'plate',
+      must: true,
+      estSec: 30,
+      prompts: {
+        full: 'Take a plate from the cupboard. Put two slices of bread on the plate.',
+        partial: 'Put two slices of bread on a plate.',
+        cue: 'Bread on plate.',
+      },
+    },
+    {
+      id: 'filling',
+      title: 'Add the filling',
+      pictogram: 'plate',
+      must: true,
+      estSec: 90,
+      prompts: {
+        full: 'Take the cheese and ham from the fridge. Put one slice of each on the bread, then put the other slice of bread on top.',
+        partial: 'Add cheese and ham from the fridge, then the top slice.',
+        cue: 'Cheese and ham.',
+      },
+    },
+    {
+      id: 'away',
+      title: 'Put food away',
+      pictogram: 'basket',
+      must: true,
+      estSec: 30,
+      prompts: {
+        full: 'Put the cheese and ham back in the fridge, then close the fridge door.',
+        partial: 'Put the cheese and ham back in the fridge.',
+        cue: 'Back in fridge.',
+      },
+    },
+    {
+      id: 'drink',
+      title: 'Pour a drink',
+      pictogram: 'cup',
+      must: false,
+      estSec: 40,
+      prompts: {
+        full: 'Fill the blue cup with water from the tap. Take your plate and the cup of water to the table.',
+        partial: 'Take your sandwich and a cup of water to the table.',
+        cue: 'Cup of water.',
+      },
+    },
+  ],
+};
+
+export const MEDICINE: RoutineDef = {
+  routineId: 'medicine',
+  name: 'Medicine routine',
+  aliases: ['medicine', 'my medicine', 'medicines', 'pills', 'tablets', 'take medicine', 'dawai'],
+  policy: DEFAULT_POLICY,
+  steps: [
+    {
+      id: 'box',
+      title: "Open today's box",
+      pictogram: 'clock',
+      must: true,
+      estSec: 30,
+      prompts: {
+        full: "Get your pill box from the kitchen shelf and open today's box. If today's box is empty, tell your support worker.",
+        partial: "Open today's box in your pill box.",
+        cue: "Today's box.",
+      },
+    },
+    {
+      id: 'water',
+      title: 'Get water',
+      pictogram: 'cup',
+      must: true,
+      estSec: 30,
+      prompts: {
+        full: 'Fill your cup with water from the tap, then sit down at the table.',
+        partial: 'Get a cup of water and sit down.',
+        cue: 'Cup of water.',
+      },
+    },
+    {
+      id: 'take',
+      title: 'Take the pills',
+      pictogram: 'cup',
+      must: true,
+      estSec: 60,
+      prompts: {
+        full: "Tip the pills from today's box into your hand. Take them one at a time, with a sip of water after each one.",
+        partial: "Take today's pills with your water.",
+        cue: 'Pills and water.',
+      },
+    },
+    {
+      id: 'check',
+      title: 'Check the box',
+      pictogram: 'step',
+      must: true,
+      estSec: 20,
+      prompts: {
+        full: "Look in today's box. If any pills are left, or you dropped one, tell your support worker.",
+        partial: "Check today's box is empty. If not, tell your support worker.",
+        cue: 'Box empty?',
+      },
+    },
+    {
+      id: 'back',
+      title: 'Put the box back',
+      pictogram: 'key',
+      must: true,
+      estSec: 20,
+      prompts: {
+        full: 'Close the lid and put your pill box back on the kitchen shelf.',
+        partial: 'Put the pill box back on the shelf.',
+        cue: 'Box on shelf.',
+      },
+    },
+  ],
+};
+
+export const BUS: RoutineDef = {
+  routineId: 'bus',
+  name: 'Bus routine',
+  aliases: ['bus', 'catch the bus', 'catch bus', 'bus stop'],
+  policy: DEFAULT_POLICY,
+  steps: [
+    {
+      id: 'time',
+      title: 'Check the time',
+      pictogram: 'clock',
+      must: true,
+      estSec: 20,
+      prompts: {
+        full: 'Look at the time on your phone. When it says 7:50, it is time to leave for the bus stop.',
+        partial: 'Leave for the bus stop at 7:50.',
+        cue: 'Leave at 7:50.',
+      },
+    },
+    {
+      id: 'pass',
+      title: 'Bus pass ready',
+      pictogram: 'bus',
+      must: true,
+      estSec: 30,
+      prompts: {
+        full: 'Take your bus pass out of your bag and put it in your coat pocket, so it is ready.',
+        partial: 'Put your bus pass in your coat pocket.',
+        cue: 'Pass in pocket.',
+      },
+    },
+    {
+      id: 'stop',
+      title: 'Walk to the stop',
+      pictogram: 'shoe',
+      must: true,
+      estSec: 300,
+      prompts: {
+        full: 'Walk to the bus stop outside the pharmacy. Stay on the pavement, and cross only when the green person shows.',
+        partial: 'Walk to the bus stop by the pharmacy.',
+        cue: 'Bus stop.',
+      },
+    },
+    {
+      id: 'number',
+      title: 'Find bus 42',
+      pictogram: 'bus',
+      must: true,
+      estSec: 300,
+      prompts: {
+        full: 'Wait at the stop. When bus number 42 comes, hold out your hand so the driver stops.',
+        partial: 'Wait for bus 42 and hold out your hand.',
+        cue: 'Bus 42.',
+      },
+    },
+    {
+      id: 'board',
+      title: 'Get on and tap',
+      pictogram: 'bus',
+      must: true,
+      estSec: 30,
+      prompts: {
+        full: 'Get on the bus, tap your pass on the reader, and sit near the front.',
+        partial: 'Tap your pass and sit near the front.',
+        cue: 'Tap pass.',
+      },
+    },
+    {
+      id: 'text',
+      title: 'Text your support worker',
+      pictogram: 'phone',
+      must: false,
+      estSec: 30,
+      prompts: {
+        full: 'When you are sitting down, send the text "on the bus" to your support worker, so they know you are on your way.',
+        partial: 'Text "on the bus" to your support worker.',
+        cue: 'Text on bus.',
+      },
+    },
+  ],
+};
+
+export const EVERYDAY_ROUTINES: readonly RoutineDef[] = [LUNCH, MEDICINE, BUS];
+
 /** A routine template the coach can propose live in the demo (it is NOT pre-published). */
 export const LAUNDRY_TEMPLATE: RoutineDef = {
   routineId: 'laundry',
@@ -252,6 +478,7 @@ export function buildSeedEvents(opts: SeedOptions): ScaffoldEvent[] {
     actorId: personId,
   });
   push({ type: 'routine.published', routine: MORNING, version: 1, at: setupAt, actorId: personId });
+  for (const routine of EVERYDAY_ROUTINES) push({ type: 'routine.published', routine, version: 1, at: setupAt, actorId: personId });
 
   let counter = 0;
   for (let day = 1; day <= SEED_DAYS; day++) {

@@ -48,7 +48,7 @@ test('coach suggests Laundry, the learner approves by voice, then starts laundry
     await page.click('.nav a[href="/"]');
     await expect(page.locator('.device')).toBeVisible();
     const t = await say(page, 'start laundry');
-    expect(t.speech).toBe("I couldn't find that routine. You have: Morning routine.");
+    expect(t.speech).toBe("I couldn't find that routine. You have: Morning routine, Lunch routine, Medicine routine, Bus routine.");
     expect(t.data?.run).toBeUndefined();
   });
 

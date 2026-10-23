@@ -125,7 +125,7 @@ const RE = {
   whatsNext: /\b(what'?s next|what is next|what now|what next|ab kya|aage kya)\b/,
   repeat: /\b(say (that|it) again|repeat|again|one more time|what did you say|pardon|come again|didn'?t hear|phir se|fir se|phirse|firse|dobara|kya bola|kya kaha)\b/,
   skip: /\b(skip|not today|leave it|chhod do|chod do|chhodo|rehne do|rahne do)\b/,
-  start: /\b(start|begin|let'?s do|lets do|let'?s start|lets start|let'?s get|lets get|time for|time to|do my|i want to do|i want to start|shuru)\b/,
+  start: /\b(start|begin|let'?s do|lets do|let'?s start|lets start|let'?s get|lets get|let'?s make|lets make|time for|time to|do my|i want to do|i want to start|take my|make my|catch the|shuru)\b/,
   yes: /^(yes|yeah|yep|yup|ya|sure|ok|okay|please|please do|go ahead|add it|approve|approved|sounds good|haan|han|haa|ha|haan ji|ha ji|ji|ji haan|theek hai|thik hai|accha|achha)\b|\b(yes|approve it|add it|go ahead)\b/,
   no: /\b(no|nope|not now|later|maybe later|don'?t|do not|decline|nahi|nahin|na|abhi nahi|mat karo|baad mein)\b/,
 };

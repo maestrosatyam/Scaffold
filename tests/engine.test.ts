@@ -17,7 +17,9 @@ import {
 import { LEVELS, levelIndex, type NewEvent, type PersonState, type ScaffoldEvent, type StepStats } from '../src/core/model.ts';
 import { finishFacts, finishSpeech, startSpeech } from '../src/core/speech.ts';
 import { independenceReport, stepView } from '../src/core/views.ts';
-import { LAUNDRY_TEMPLATE, MORNING, OUTCOMES, buildSeedEvents } from '../src/demo/seed.ts';
+import { EVERYDAY_ROUTINES, LAUNDRY_TEMPLATE, MORNING, OUTCOMES, buildSeedEvents } from '../src/demo/seed.ts';
+import { validateRoutine } from '../src/core/validate.ts';
+import { PICTOGRAM_KEYS } from '../src/apps/pictogram-keys.ts';
 
 const TZ = 'America/Los_Angeles';
 
@@ -256,5 +258,29 @@ describe('seeded demo history', () => {
   it('replay is deterministic', () => {
     const again = buildSeedEvents({ today: '2026-10-18', timeZone: TZ });
     expect(JSON.stringify(again)).toBe(JSON.stringify(events));
+  });
+
+  it('publishes the everyday routines after the morning one, new and at full prompts, without changing the default', () => {
+    expect(state.routineOrder).toEqual(['morning', 'lunch', 'medicine', 'bus']);
+    expect(findRoutine(state, undefined)!.routineId).toBe('morning');
+    for (const r of EVERYDAY_ROUTINES) {
+      for (const s of r.steps) expect(state.stats[`${r.routineId}/${s.id}`]?.level ?? 'full').toBe('full');
+    }
+  });
+
+  it('every seeded routine passes the same checks a coach suggestion must pass, with no warnings', () => {
+    for (const r of [MORNING, ...EVERYDAY_ROUTINES]) expect(validateRoutine(r, new Set(PICTOGRAM_KEYS))).toEqual([]);
+  });
+
+  it('resolves the way people ask for the everyday routines', () => {
+    const asked: [string, string][] = [
+      ['take medicine', 'medicine'],
+      ['pills', 'medicine'],
+      ['make lunch', 'lunch'],
+      ['sandwich', 'lunch'],
+      ['catch bus', 'bus'],
+      ['bus', 'bus'],
+    ];
+    for (const [ref, id] of asked) expect([ref, findRoutine(state, ref)?.routineId]).toEqual([ref, id]);
   });
 });
