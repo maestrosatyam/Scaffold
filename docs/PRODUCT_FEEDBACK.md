@@ -4,6 +4,21 @@ Every tool, API and SDK we actually used gets the five rules questions below. We
 
 ---
 
+## AWS services used, and how (AWS Builder mini-challenge)
+Scaffold runs live on AWS at https://tjncr2jv6v7sqw6jw467fbdyha0pesly.lambda-url.ap-southeast-2.on.aws/. It was deployed from `infra/template.yaml` (SAM) through CloudFormation.
+- **AWS Lambda (Node.js 22, arm64) with a Function URL.** It serves the MCP Streamable HTTP endpoint (`/mcp`), the demo sandbox API and the simulated Echo Show web app.
+- **Amazon DynamoDB (on-demand, SSE, TTL).** It holds the append-only, per-person event log:
+  - optimistic-concurrency appends with `TransactWriteItems` (a tail `ConditionCheck` plus an idempotency token);
+  - consistent paginated `Query` for replay;
+  - TTL for judge sandboxes.
+- **Amazon CloudWatch.** Logs with 14-day retention, and an error alarm for uptime through judging.
+- **AWS Budgets, Amazon SNS and a guard Lambda.** A $20/month cap that enforces itself. At 100% of actual spend, the guard sets reserved concurrency to 0. We tested it live: 429 while capped, 200 after reset.
+- **AWS CloudFormation / SAM.** One template, with every resource tagged `Project=scaffold-adh2026`.
+
+Evidence: `docs/evidence/aws/DEPLOYMENT.md`. All 11 browser end-to-end tests pass against the live URL.
+
+---
+
 ## 1. Alexa+ for Builders: MCP Toolkit documentation (read and designed against; toolkit itself not accessible)
 **What we used it for.** We designed our MCP server to the documented contract:
 - MCP spec 2025-11-25 over Streamable HTTP;
@@ -29,7 +44,7 @@ Pages: overview, quickstart, client lifecycle, functional requirements, design g
 
 **Would we build with it again?** **Yes**, once access opens. The MCP-native approach meant our server works with any MCP client today, and could be onboarded to Alexa+ without rewriting it.
 
-## 2. AWS SDK for JavaScript v3: `@aws-sdk/client-dynamodb` (used in code; tested with mocks, not against a live table)
+## 2. AWS SDK for JavaScript v3: `@aws-sdk/client-dynamodb` (used in code; contract-tested with mocks and running live on DynamoDB)
 **What we used it for.** The production event store (`src/store/dynamo.ts`):
 - consistent paginated `Query` (`LastEvaluatedKey`);
 - an optimistic-concurrency append with `TransactWriteItems`: a `ConditionCheck` on the tail item plus conditional `Put`s, with a deterministic `ClientRequestToken`;
@@ -46,25 +61,26 @@ Pages: overview, quickstart, client lifecycle, functional requirements, design g
 - **Auto-generated `ClientRequestToken`.** Whether the SDK auto-generates the token and reuses it across its own retries isn't obvious from the API reference. We set one explicitly to be sure.
 - **Silent no-ops in conditions.** The interaction between `attribute_not_exists(pk)` and the full primary key confuses people. Our own reviewer had to confirm that it is evaluated against the item with the full key. A short doc note, "conditions are evaluated against the item with the full primary key", would help.
 
-**Onboarding.** Writing the code was quick. Testing it against real DynamoDB needs an AWS account, which we didn't have during the build. DynamoDB Local (Docker) was too large for our disk budget.
+**Onboarding.** Writing the code was quick. DynamoDB Local (Docker) was too large for our disk budget, so we relied on contract tests until we had an account. Once deployed, the same store passed the full browser suite against the live table on its first run.
 
 **Would we build with it again?** **Yes.**
 
-## 3. AWS SAM / CloudFormation (template authored; NOT deployed)
+## 3. AWS SAM / CloudFormation, Lambda Function URLs, Budgets and SNS (deployed)
 **What we used it for.** `infra/template.yaml` defines:
 - a Lambda (arm64) with a Function URL;
 - a DynamoDB table (on-demand, SSE, TTL);
 - a CloudWatch error alarm;
-- an optional AWS Budget;
+- a $20/month AWS Budget wired through SNS to a guard Lambda that throttles the app to zero at the cap;
 - a log group with 14-day retention.
 
 **What worked well.** `AWS::Serverless::Function` with `FunctionUrlConfig` and policy templates (`DynamoDBCrudPolicy`) keeps the template short. `AWS::Budgets::Budget` lets a hackathon project ship its own cost guard.
 
 **What needs work.**
 - **The Function URL hostname is unknown until after deploy.** Our server needs it for a Host allowlist (DNS-rebinding protection), so a two-step deploy is required. Exposing the URL domain as a pre-deploy, predictable value, or documenting a recommended pattern, would help.
-- **No offline validation.** We couldn't run `sam validate` without installing the SAM CLI, which was too large for our disk budget.
+- **No offline validation.** We couldn't run `sam validate` without installing the SAM CLI, which was too large for our disk budget. We deployed with the plain AWS CLI instead: `cloudformation package` plus `deploy` applies the SAM transform server-side. That worked well and deserves a mention in the SAM docs.
+- **No hard spending cap.** Budgets only alert. For a hackathon demo on a public URL, a built-in "stop at $X" switch would beat wiring Budgets → SNS → Lambda → `PutFunctionConcurrency(0)` by hand. On a new account the Lambda concurrency quota is 10, so reserving a small fixed concurrency for cost control isn't even allowed.
 
-**Onboarding.** Not executed. We had no AWS credentials.
+**Onboarding.** The first deploy was quick. The hard part was account plumbing, not the template: Organizations policies, the CLI signing in to the wrong account, and Bedrock verification (friction entries F-10 and F-11). One real bug appeared only on the live URL (F-09).
 
 **Would we build with it again?** **Yes.**
 

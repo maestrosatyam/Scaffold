@@ -12,6 +12,13 @@ Scaffold is a **self-hosted MCP server**. It uses **Streamable HTTP** and **MCP 
 
 > **Honest boundary.** The Alexa+ developer toolkit is partner-only, so this repo includes a **simulated Alexa+ surface**: a web page that is a *real* MCP client and a *real* MCP Apps host. It is labelled "Simulated Alexa+ surface — not Amazon software" on every screen. It does not run on an Echo, and it is not affiliated with or certified by Amazon. All people and history in the demo are **synthetic**.
 
+## Try it live
+**https://tjncr2jv6v7sqw6jw467fbdyha0pesly.lambda-url.ap-southeast-2.on.aws/** needs no sign-in, no keys and no install.
+- It opens the simulated Echo Show. Say or type **"start my morning"**.
+- Each browser session gets its own seeded sandbox.
+- It is hosted on AWS Lambda and DynamoDB (Sydney) and stays up through the judging period.
+- The MCP endpoint is `…on.aws/mcp`. See "Use it from any MCP client" below for a token.
+
 ![Simulated Echo Show: a step at full support after "help", with the live MCP trace](docs/screenshots/simulator-help.png)
 
 | Time machine (replayed from the event log) | Learner device + coach view |
@@ -55,6 +62,17 @@ npx -y @modelcontextprotocol/inspector@2.11.0 --cli http://127.0.0.1:8787/mcp --
 # Any other MCP client that supports Streamable HTTP: point it at http://127.0.0.1:8787/mcp
 ```
 
+**Against the hosted server.** The public URL never hands out a shared learner, so create a private sandbox first. It is seeded with the same 21 days of synthetic history, and its tokens last 6 hours.
+
+```bash
+URL=https://tjncr2jv6v7sqw6jw467fbdyha0pesly.lambda-url.ap-southeast-2.on.aws
+TOKEN=$(curl -s -X POST $URL/api/demo/sandbox | node -p 'JSON.parse(require("fs").readFileSync(0)).learnerToken')
+npx -y @modelcontextprotocol/inspector@2.11.0 --cli $URL/mcp --transport http \
+  --header "Authorization: Bearer $TOKEN" --method tools/list
+```
+
+The same response also carries a `coachToken` for the 6 coach tools.
+
 ### Tools (the list depends on the role in the token)
 | Learner (11) | What it does |
 |---|---|
@@ -95,18 +113,23 @@ npm run typecheck
 npm run test:e2e      # browser end-to-end (Playwright with the cached Chromium; results in docs/evidence/TEST_RUNS.md)
 ```
 
-## Deploy to AWS (optional, near-zero cost)
-`infra/template.yaml` (AWS SAM) creates:
-- **Lambda (arm64) with a Function URL**, serving `/mcp`, the demo API and the simulator;
-- **DynamoDB, on-demand**, with TTL for demo sandboxes;
+## Deploy to AWS (near-zero cost, capped)
+The live demo above runs from `infra/template.yaml` (AWS SAM), which creates:
+- **Lambda (arm64) with a public Function URL**, serving `/mcp`, the demo API and the simulator;
+- **DynamoDB, on-demand**, with SSE and a TTL for demo sandboxes;
 - a **CloudWatch error alarm**;
-- an **optional $5/month AWS Budget**.
+- **a $20/month cost cap that enforces itself.**
+  - At 100% of actual spend (credits not deducted), an AWS Budget publishes to SNS.
+  - A guard Lambda then sets the app's reserved concurrency to 0, so every request is throttled and nothing more is spent.
+  - There are also email alerts at 80% and when spend is forecast to reach the cap.
 
 ```bash
-scripts/package-lambda.sh
-sam deploy --guided --template-file infra/template.yaml   # set TokenSecret; then redeploy with AllowedHosts=<function-url-host>
-sam delete --stack-name <stack>                          # teardown
+STACK=scaffold REGION=us-east-1 BUDGET_EMAIL=you@example.com scripts/deploy-aws.sh   # AWS CLI only; tags everything Project=$STACK
+aws lambda delete-function-concurrency --function-name <FunctionName output>        # lift the cap after a review
+aws cloudformation delete-stack --stack-name scaffold                                # teardown
 ```
+
+The script deploys in two passes: the Function URL host is only known after the first, and is then pinned as the Host allowlist. It generates the sandbox-token secret once, under the ignored `data/` folder. Deployment evidence, including the live end-to-end run and a live test of the cost cap, is in [docs/evidence/aws/DEPLOYMENT.md](docs/evidence/aws/DEPLOYMENT.md).
 
 ## Configuration
 See `.env.example`. A local demo needs none of it.

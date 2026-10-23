@@ -30,6 +30,6 @@ Context: Alexa+ account linking (OAuth 2.1 with PKCE) can't be exercised without
 Decision: `SCAFFOLD_TOKENS` static tokens, an anonymous local learner, and per-visitor sandboxes with random tokens and a 6 h TTL.
 Consequences: Production would replace token lookup with OAuth token verification; the Actor shape is unchanged. Documented as a limitation.
 
-## ADR-007 — AWS deployment via Lambda Function URL + DynamoDB (serverless-http) — 2026-10-17 — Accepted (not yet deployed)
+## ADR-007 — AWS deployment via Lambda Function URL + DynamoDB (serverless-http) — 2026-10-17 — Accepted (deployed 2026-10-23, ap-southeast-2)
 Decision: One arm64 Lambda function wraps the same Express app. DynamoDB on-demand stores the events. A CloudWatch alarm and an optional $5 budget are included. The code is compiled to JS with `tsc` (`rewriteRelativeImportExtensions`), so the Lambda runtime doesn't need Node type stripping.
 Consequences: Near-zero cost and the same code path as local. Blocked on credentials.

@@ -88,6 +88,14 @@ describe('Lambda deployment (infra/template.yaml + src/server/lambda.ts)', () =>
     expect(json.result.protocolVersion).toBe('2025-11-25');
   });
 
+  it('R-21: POST /mcp keeps its response headers behind serverless-http (an SSE body sent as application/json breaks every browser client)', async () => {
+    const handler = await loadLambda({ ...TEMPLATE_DEFAULT_ENV, ALLOWED_HOSTS: HOST, SCAFFOLD_TOKENS: 'T=sam:learner:sam' });
+    const res = await handler(urlEvent('/mcp', 'POST', INIT, { ...MCP_HEADERS, authorization: 'Bearer T' }), {});
+    expect(res.statusCode).toBe(200);
+    expect(String(res.body)).toMatch(/^event: message/);
+    expect(res.headers?.['content-type']).toMatch(/^text\/event-stream/);
+  });
+
   it('R-01: POST /mcp-json initialize also works behind serverless-http', async () => {
     const handler = await loadLambda({ ...TEMPLATE_DEFAULT_ENV, ALLOWED_HOSTS: HOST, SCAFFOLD_TOKENS: 'T=sam:learner:sam' });
     const res = await handler(urlEvent('/mcp-json', 'POST', INIT, { ...MCP_HEADERS, accept: 'application/json', authorization: 'Bearer T' }), {});

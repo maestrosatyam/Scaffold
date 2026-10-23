@@ -2,6 +2,8 @@
 // state lives in DynamoDB (SCAFFOLD_STORE=dynamodb). Tool responses are small and immediate, so a
 // buffered (non-streaming) Lambda response carries the Streamable HTTP reply unchanged.
 import { randomBytes } from 'node:crypto';
+import type { OutgoingHttpHeaders } from 'node:http';
+import express, { type NextFunction, type Request, type Response } from 'express';
 import serverless from 'serverless-http';
 import { resolve } from 'node:path';
 import { packageRoot } from './root.ts';
@@ -55,7 +57,27 @@ const ensureSeed = (): Promise<void> =>
     throw err;
   }));
 
-const wrapped = serverless(app, {
+// serverless-http returns only the headers Node recorded (res.getHeaders()). Node does not record
+// headers passed straight to writeHead() unless setHeader() ran first, and Express replaces
+// serverless-http's writeHead override when it re-prototypes the response. The MCP SDK sets its
+// headers that way, so /mcp would answer an SSE body as application/json. Record them first.
+const outer = express();
+outer.disable('x-powered-by');
+outer.use((_req: Request, res: Response, next: NextFunction) => {
+  const writeHead = res.writeHead;
+  res.writeHead = function (this: Response, status: number, ...rest: unknown[]) {
+    const reason = typeof rest[0] === 'string' ? rest[0] : undefined;
+    const headers = (reason === undefined ? rest[0] : rest[1]) as OutgoingHttpHeaders | undefined;
+    if (headers && !Array.isArray(headers)) {
+      for (const [name, value] of Object.entries(headers)) if (value !== undefined) this.setHeader(name, value);
+    }
+    return (writeHead as (code: number, reason?: string) => Response).call(this, status, reason);
+  } as typeof res.writeHead;
+  next();
+});
+outer.use(app);
+
+const wrapped = serverless(outer, {
   // serverless-http builds a synthetic request without rawHeaders; the MCP Node transport reads them.
   request(req: { headers: Record<string, string | string[] | undefined>; rawHeaders?: string[] }) {
     if (!req.rawHeaders || req.rawHeaders.length === 0) {

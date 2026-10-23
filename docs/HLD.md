@@ -43,7 +43,7 @@ flowchart LR
 |---|---|---|---|
 | Local (judge reproduction) | `npm ci && npm run build && npm start` | SQLite file `data/scaffold.db` | No keys; seeds 21 days of synthetic history on first boot |
 | Tests | `npm test` | memory, SQLite in a temp directory, mocked DynamoDB | Includes real-HTTP MCP client tests |
-| AWS | `scripts/package-lambda.sh` then `sam deploy` (`infra/template.yaml`) | DynamoDB on-demand | Lambda arm64 with a Function URL, a CloudWatch error alarm and an optional $5 budget. **Not deployed yet: no credentials.** |
+| AWS (live) | `scripts/deploy-aws.sh` (`infra/template.yaml` via CloudFormation) | DynamoDB on-demand | Lambda arm64 with a public Function URL, a CloudWatch error alarm and a $20/month cost cap (Budget → SNS → guard Lambda throttles to zero). **Live in ap-southeast-2; see `docs/evidence/aws/DEPLOYMENT.md`.** |
 
 ## Request flow: "done"
 1. The client sends `tools/call step_done {run_id, step_id}` with a bearer token.

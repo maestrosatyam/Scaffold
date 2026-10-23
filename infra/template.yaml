@@ -26,10 +26,14 @@ Parameters:
   BudgetEmail:
     Type: String
     Default: ''
-    Description: If set, creates a USD 5/month AWS Budget that emails at 80% of actual spend.
+    Description: Optional address for budget alerts (80% and 100% of actual spend, 100% forecast).
+  BudgetLimitUsd:
+    Type: Number
+    Default: 20
+    Description: Monthly cost cap in USD (credits not deducted). At 100% of actual spend the guard throttles the function to zero.
 
 Conditions:
-  HasBudget: !Not [!Equals [!Ref BudgetEmail, '']]
+  HasEmail: !Not [!Equals [!Ref BudgetEmail, '']]
 
 Resources:
   EventsTable:
@@ -91,18 +95,79 @@ Resources:
       ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: notBreaching
 
+  # Cost cap: the budget publishes to this topic at 100% of actual spend, and the guard sets the
+  # function's reserved concurrency to 0 (every request is throttled, so it stops costing money).
+  # Budgets refresh a few times a day, so the cap is approximate. Undo after review with:
+  #   aws lambda delete-function-concurrency --function-name <ScaffoldFunction>
+  BudgetTopic:
+    Type: AWS::SNS::Topic
+
+  BudgetTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics: [!Ref BudgetTopic]
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: budgets.amazonaws.com }
+            Action: SNS:Publish
+            Resource: !Ref BudgetTopic
+            Condition: { StringEquals: { 'aws:SourceAccount': !Ref AWS::AccountId } }
+
+  BudgetGuardFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: nodejs22.x
+      Architectures: [arm64]
+      Handler: index.handler
+      Timeout: 10
+      Environment:
+        Variables:
+          TARGET: !Ref ScaffoldFunction
+      InlineCode: |
+        const { LambdaClient, PutFunctionConcurrencyCommand } = require('@aws-sdk/client-lambda');
+        const lambda = new LambdaClient({});
+        exports.handler = async (event) => {
+          console.log('budget alert:', (event.Records ?? []).map((r) => r.Sns && r.Sns.Subject).join('; '));
+          await lambda.send(new PutFunctionConcurrencyCommand({ FunctionName: process.env.TARGET, ReservedConcurrentExecutions: 0 }));
+          return { throttled: process.env.TARGET };
+        };
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: lambda:PutFunctionConcurrency
+              Resource: !GetAtt ScaffoldFunction.Arn
+      Events:
+        BudgetAlert:
+          Type: SNS
+          Properties: { Topic: !Ref BudgetTopic }
+
   CostBudget:
     Type: AWS::Budgets::Budget
-    Condition: HasBudget
+    DependsOn: BudgetTopicPolicy
     Properties:
       Budget:
-        BudgetName: !Sub '${AWS::StackName}-monthly'
+        BudgetName: !Sub '${AWS::StackName}-monthly-cap'
         BudgetType: COST
         TimeUnit: MONTHLY
-        BudgetLimit: { Amount: 5, Unit: USD }
+        BudgetLimit: { Amount: !Ref BudgetLimitUsd, Unit: USD }
+        CostTypes: { IncludeCredit: false, IncludeRefund: false }
       NotificationsWithSubscribers:
-        - Notification: { NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 80, ThresholdType: PERCENTAGE }
-          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref BudgetEmail }]
+        - Notification: { NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 100, ThresholdType: PERCENTAGE }
+          Subscribers:
+            - { SubscriptionType: SNS, Address: !Ref BudgetTopic }
+            - !If [HasEmail, { SubscriptionType: EMAIL, Address: !Ref BudgetEmail }, !Ref AWS::NoValue]
+        - !If
+          - HasEmail
+          - Notification: { NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 80, ThresholdType: PERCENTAGE }
+            Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref BudgetEmail }]
+          - !Ref AWS::NoValue
+        - !If
+          - HasEmail
+          - Notification: { NotificationType: FORECASTED, ComparisonOperator: GREATER_THAN, Threshold: 100, ThresholdType: PERCENTAGE }
+            Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref BudgetEmail }]
+          - !Ref AWS::NoValue
 
 Outputs:
   FunctionUrl:
@@ -110,3 +175,6 @@ Outputs:
     Value: !GetAtt ScaffoldFunctionUrl.FunctionUrl
   EventsTableName:
     Value: !Ref EventsTable
+  FunctionName:
+    Description: Throttled to zero by the budget guard at the cost cap
+    Value: !Ref ScaffoldFunction

@@ -90,5 +90,54 @@ Only issues we actually hit while building are logged here, with the time we hit
 - **Workaround:** Contract tests with `aws-sdk-client-mock`, covering pagination, cancelled transactions and unprocessed items.
 - **Suggested fix:** A slim native DynamoDB Local build, or a documented in-process test double.
 
+### F-09 · On Lambda, every MCP response header was dropped, so SSE was served as `application/json`
+- **When:** 2026-10-23 20:50 IST, on the first live deploy
+- **Task:** Serve the MCP TypeScript SDK's Streamable HTTP endpoint from a Lambda Function URL, through Express and `serverless-http`.
+- **Steps:** Deploy, then open the simulator, or `curl -D -` a `POST /mcp` `initialize`.
+- **Expected:** `Content-Type: text/event-stream` with an `event: message` body, as locally.
+- **Actual:** `Content-Type: application/json` with an SSE body. Every browser MCP client failed ("Unexpected token 'e', \"event: mes\"… is not valid JSON"), and 10 of 11 e2e tests failed. No unit test noticed.
+  - serverless-http reads `res.getHeaders()`.
+  - Node doesn't record headers passed directly to `writeHead()` unless `setHeader()` ran first.
+  - Express replaces serverless-http's `writeHead` override.
+  - The Function URL then silently defaults to `application/json`.
+- **Severity:** High. The hosted demo was unusable while `/healthz` looked healthy.
+- **Workaround:** A wrapper records `writeHead()` headers with `setHeader()`. Regression test R-21.
+- **Suggested fix:** Function URLs could refuse or warn on a response with no `Content-Type` instead of defaulting to JSON. A Lambda recipe for MCP Streamable HTTP servers would cover this.
+
+### F-10 · A brand-new account could not call Amazon Bedrock on deadline day
+- **When:** 2026-10-23 18:30–21:00 IST
+- **Task:** Drive our MCP server with Amazon Nova (via Strands Agents) to show an LLM choosing the tools.
+- **Steps:**
+  1. Call `bedrock-runtime converse` with `us.amazon.nova-2-lite-v1:0`.
+  2. Then list the quotas in Service Quotas.
+- **Expected:** A small default on-demand quota on a paid account with credits.
+- **Actual:**
+  - First, *"Your account is currently being verified … normally takes less than 2 hours"*.
+  - Then *"Too many tokens per day"*.
+  - In one region every Nova tokens-per-day quota read 0 and was marked **not adjustable**. In another region the listed quota was large, but calls were still refused.
+- **Severity:** High for hackathon builders. The feature was dropped from the submission.
+- **Workaround:** None in time. The Nova client was kept out of the submission.
+- **Suggested fix:**
+  - Show the verification status and an ETA in the Bedrock console.
+  - Make the effective quota (after verification) visible.
+  - Give new accounts a small, adjustable starter quota.
+
+### F-11 · `aws login` signed the CLI in to the wrong account
+- **When:** 2026-10-23 20:35 IST
+- **Task:** Point the CLI at a newly created member account.
+- **Steps:** `aws logout`, then `aws login --region …` while a console session for another account was open.
+- **Expected:** A choice of account, or at least a confirmation naming the account.
+- **Actual:** It reused the existing browser console session ("Opening in existing browser session") and wrote that account's role into the default profile. The mismatch only showed up on the next denied API call.
+- **Severity:** Medium.
+- **Workaround:** `aws login --profile <name>` after switching the console to the right account, then check with `sts get-caller-identity`.
+- **Suggested fix:** Show the account ID and alias on the confirmation page, and accept `--account-id` to refuse a mismatched session.
+
+### F-12 · Boto3 needs `botocore[crt]` for `aws login` credentials, and says so only on the first API call
+- **When:** 2026-10-23 18:40 IST
+- **Task:** Run a Strands Agents script with credentials from `aws login`.
+- **Actual:** `MissingDependencyException: Using the login credential provider requires an additional dependency … pip install "botocore[crt]"`. This was raised when the model client was created, not at install time.
+- **Severity:** Low. The message is clear.
+- **Suggested fix:** Mention it in the `aws login` docs and the Strands quickstart, or declare the extra in SDKs that build Bedrock clients.
+
 ---
 *Entries continue below as we hit new issues during deployment and recording.*
