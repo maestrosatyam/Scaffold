@@ -33,7 +33,7 @@ https://tjncr2jv6v7sqw6jw467fbdyha0pesly.lambda-url.ap-southeast-2.on.aws/ needs
 - **"Where was I?"** resumes the same run on another device, so the person can move from the bedroom to the kitchen.
 - **The learner owns their routines.** A coach can only suggest a routine, and it takes effect only when the learner says "yes".
 - **The routines come from the research.** The demo covers mornings, a cold lunch, a pill-box medicine routine and catching the bus. Published studies name these as the daily tasks where adults with intellectual disability or brain injury most often need support, and say that task analysis with faded prompts teaches them. Sources, quotes and limits are in [docs/RESEARCH_BASIS.md](docs/RESEARCH_BASIS.md).
-- **The words are always the same.** The same state always produces exactly the same words, which many learners need. With no LLM in the server, tool calls stay well inside the Alexa+ 500 ms budget; server p95 is in single-digit milliseconds.
+- **The words are always the same.** The same state always produces exactly the same words, which many learners need. With no LLM in the server, tool calls stay well inside the Alexa+ 500 ms budget. Server p95 is in single-digit milliseconds locally, and about 41 ms on a warm instance of the live Lambda + DynamoDB deployment.
 
 ## Quick start (no keys, no cloud)
 You need Node.js 22.18 or later (see `.nvmrc`), which runs the server's TypeScript directly with no build step. On an older Node, `npm ci` stops with an engines error.
