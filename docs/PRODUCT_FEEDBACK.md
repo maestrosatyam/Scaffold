@@ -7,6 +7,7 @@ Scaffold runs live on AWS at https://tjncr2jv6v7sqw6jw467fbdyha0pesly.lambda-url
 - Amazon CloudWatch keeps logs for 14 days and raises an alarm on errors, so we know if the demo goes down during judging.
 - AWS Budgets, Amazon SNS and a small guard Lambda enforce a $20/month cap. When actual spend reaches 100%, the guard sets the app's reserved concurrency to 0. We tested it on the live stack: 429 while capped, 200 after reset.
 - AWS CloudFormation and SAM: one template, with every resource tagged Project=scaffold-adh2026.
+- Amazon Bedrock (Amazon Nova 2 Lite) through the Strands Agents SDK: a script gives Nova only Scaffold's MCP instructions and tools and drives the live server from everyday speech, the job Alexa+ does in production. Nova chose the right tool and spoke the server's words exactly in 9 of 9 turns (section 8).
 
 All 11 browser end-to-end tests pass against the live URL. The deployment record is in the repo at docs/evidence/aws/DEPLOYMENT.md.
 
@@ -107,7 +108,7 @@ Would we use them again? Yes. They're the quickest independent check that a serv
 
 7. STRANDS AGENTS PYTHON SDK (strands-agents/harness-sdk)
 
-What we used it for: our second open-source contribution. We reproduced and fixed issue #4896, where concurrent MCPClient.load_tools() calls fail.
+What we used it for: two things. Its MCP client connects Amazon Nova to our live server in agent/nova_agent.py (section 8). It's also where we made our second open-source contribution: we reproduced and fixed issue #4896, where concurrent MCPClient.load_tools() calls fail.
 
 What worked well: a large, fast unit-test suite, clear contribution guidelines, and an MCP client design that mirrors the TypeScript SDK, which made it easy to match the fix to how the TypeScript client behaves.
 
@@ -118,9 +119,24 @@ Getting started: uv plus an editable install got the MCP tests running quickly. 
 Would we build with it again? Yes. The codebase was easy to work in, and the MCP client is cleanly structured.
 
 
-8. TRIED OR EVALUATED, BUT NOT USED
+8. AMAZON BEDROCK (AMAZON NOVA 2 LITE)
 
-- Amazon Bedrock (Nova 2 Lite, through Strands Agents): we wanted to show an LLM choosing Scaffold's tools. On deadline day our new account was first held for verification, then refused with "Too many tokens per day", so we dropped the feature (F-10).
+What we used it for: checking that a real language model can drive Scaffold, which is Alexa+'s job in production. agent/nova_agent.py gives Amazon Nova 2 Lite (us.amazon.nova-2-lite-v1:0, temperature 0) only Scaffold's MCP instructions and its 11 learner tools, through the Strands Agents MCP client, and feeds it everyday speech against the live server. The server itself still runs no LLM.
+
+What worked well: Nova 2 Lite followed the server's instructions closely. Across 9 messy utterances, including "ho gaya" and "wait, what goes in my bag again?", it chose the right tool every time, chained the real run and step ids, and spoke the server's words exactly in 9 of 9 turns. The run also exposed a bug in our server that our own tests had missed: ids were only in structuredContent, which Strands doesn't pass to the model. We fixed it by also returning the structured result as JSON text, as the MCP spec recommends.
+
+What needs work:
+- New accounts. On deadline day our new account was first held for verification ("normally takes less than 2 hours"), then refused with "Too many tokens per day". In one region every Nova tokens-per-day quota read 0 and was marked not adjustable; in another the listed quota was large, but calls were still refused (F-10).
+- There's no way to see the verification status or the quota that actually applies. A status and expected time in the console, and a small adjustable starter quota for new accounts, would have saved us hours.
+- Even on our older account, Nova Pro was still "being verified" while Nova 2 Lite worked.
+
+Getting started: about four hours, almost all of it account access rather than code. The new account was blocked from 18:30 IST. At 22:45 IST we switched to an older account in the same AWS Organization, and Nova 2 Lite answered at once. Using aws login credentials from Python also needed the botocore[crt] extra, which boto3 only reports on the first API call (F-12). The agent script itself was quick to write; its first run found the bug in our server described above.
+
+Would we build with it again? Yes. Once we had access, Nova and Strands gave us a cheap, realistic stand-in for Alexa+ choosing our tools, and it caught a bug our tests had missed. We'd want the new-account quota problem fixed first.
+
+
+9. TRIED OR EVALUATED, BUT NOT USED
+
 - Fire TV Vega SDK: it needs about 20 GB of disk space, more than we had (F-05).
 - Ring Developer Playground: it needs an account and offers no event simulation, so we didn't go further.
 - Bee: it needs a device, which we don't have.

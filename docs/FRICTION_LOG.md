@@ -125,7 +125,7 @@ Steps:
 2. List the quotas in Service Quotas.
 Expected: A small default on-demand quota on a paid account with credits.
 Actual: First, "Your account is currently being verified … normally takes less than 2 hours". Then, "Too many tokens per day". In one region every Nova tokens-per-day quota read 0 and was marked not adjustable. In another region the listed quota was large, but calls were still refused.
-Severity: High for hackathon builders. We had to drop the feature.
+Severity: High for hackathon builders. It blocked the feature for over four hours on deadline day, until we switched to an older account.
 Workaround: At 22:45 IST we called Bedrock from an older account in the same AWS Organization. Nova 2 Lite answered at once there; Nova Pro was still "being verified".
 Suggested fix: Show the verification status and an expected time in the Bedrock console, make the effective quota after verification visible, and give new accounts a small, adjustable starter quota.
 
