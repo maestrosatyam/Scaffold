@@ -12,3 +12,7 @@ build/
 
 # local runtime data (db, token secret)
 data/
+
+# agent virtualenv
+agent/.venv/
+__pycache__/

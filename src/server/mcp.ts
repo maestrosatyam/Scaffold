@@ -64,7 +64,9 @@ type ToolResult = { content: { type: 'text'; text: string }[]; structuredContent
 
 function ok(structured: { speech: string } & Record<string, unknown>, fallbackText?: string): ToolResult {
   const text = structured.speech || fallbackText || '(no speech: the person is doing this step on their own)';
-  return { content: [{ type: 'text', text }], structuredContent: structured };
+  // The spec asks tools with structured output to repeat it as JSON text: many clients (and the
+  // LLMs behind them) only read text blocks, and without it they cannot see run_id / step_id.
+  return { content: [{ type: 'text', text }, { type: 'text', text: JSON.stringify(structured) }], structuredContent: structured };
 }
 
 function fail(err: unknown): ToolResult {

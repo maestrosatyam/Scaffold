@@ -1,0 +1,182 @@
+{
+  "when": "2026-10-23 17:22 UTC",
+  "server": "https://tjncr2jv6v7sqw6jw467fbdyha0pesly.lambda-url.ap-southeast-2.on.aws",
+  "model": "us.amazon.nova-2-lite-v1:0",
+  "person": "sam-eda59adcb39d",
+  "tools": [
+    "start_routine",
+    "step_done",
+    "need_help",
+    "repeat_step",
+    "where_was_i",
+    "running_late",
+    "skip_step",
+    "review_suggestions",
+    "decide_suggestion",
+    "my_progress",
+    "list_routines"
+  ],
+  "turns": [
+    {
+      "utterance": "hey, ok... let's do my morning stuff",
+      "tool_calls": [
+        {
+          "name": "start_routine",
+          "input": {
+            "routine": "morning"
+          },
+          "status": "success",
+          "speech": "Okay, morning routine. I'm here if you need me."
+        }
+      ],
+      "server_speech": "Okay, morning routine. I'm here if you need me.",
+      "spoken": "Okay, morning routine. I'm here if you need me.",
+      "verbatim": true,
+      "seconds": 2.81
+    },
+    {
+      "utterance": "teeth are done",
+      "tool_calls": [
+        {
+          "name": "step_done",
+          "input": {
+            "run_id": "run-f24f5a0958",
+            "step_id": "teeth"
+          },
+          "status": "success",
+          "speech": "Okay."
+        }
+      ],
+      "server_speech": "Okay.",
+      "spoken": "Okay.",
+      "verbatim": true,
+      "seconds": 2.19
+    },
+    {
+      "utterance": "yep, finished that one",
+      "tool_calls": [
+        {
+          "name": "step_done",
+          "input": {
+            "step_id": "face",
+            "run_id": "run-f24f5a0958"
+          },
+          "status": "success",
+          "speech": "Clothes on the chair."
+        }
+      ],
+      "server_speech": "Clothes on the chair.",
+      "spoken": "Clothes on the chair.",
+      "verbatim": true,
+      "seconds": 2.71
+    },
+    {
+      "utterance": "ho gaya",
+      "tool_calls": [
+        {
+          "name": "step_done",
+          "input": {
+            "step_id": "dress",
+            "run_id": "run-f24f5a0958"
+          },
+          "status": "success",
+          "speech": "Okay."
+        }
+      ],
+      "server_speech": "Okay.",
+      "spoken": "Okay.",
+      "verbatim": true,
+      "seconds": 2.47
+    },
+    {
+      "utterance": "ok did it",
+      "tool_calls": [
+        {
+          "name": "step_done",
+          "input": {
+            "step_id": "breakfast",
+            "run_id": "run-f24f5a0958"
+          },
+          "status": "success",
+          "speech": "Pack your lunch box, bus pass and phone in your bag."
+        }
+      ],
+      "server_speech": "Pack your lunch box, bus pass and phone in your bag.",
+      "spoken": "Pack your lunch box, bus pass and phone in your bag.",
+      "verbatim": true,
+      "seconds": 2.9
+    },
+    {
+      "utterance": "wait, what goes in my bag again?",
+      "tool_calls": [
+        {
+          "name": "need_help",
+          "input": {
+            "step_id": "bag",
+            "run_id": "run-f24f5a0958"
+          },
+          "status": "success",
+          "speech": "Step 5 of 6. Open your bag. Put in your lunch box from the fridge, your bus pass from the hook, and your phone. Zip the bag closed."
+        }
+      ],
+      "server_speech": "Step 5 of 6. Open your bag. Put in your lunch box from the fridge, your bus pass from the hook, and your phone. Zip the bag closed.",
+      "spoken": "Step 5 of 6. Open your bag. Put in your lunch box from the fridge, your bus pass from the hook, and your phone. Zip the bag closed.",
+      "verbatim": true,
+      "seconds": 2.93
+    },
+    {
+      "utterance": "can you say that again",
+      "tool_calls": [
+        {
+          "name": "repeat_step",
+          "input": {
+            "run_id": "run-f24f5a0958"
+          },
+          "status": "success",
+          "speech": "Step 5 of 6. Open your bag. Put in your lunch box from the fridge, your bus pass from the hook, and your phone. Zip the bag closed."
+        }
+      ],
+      "server_speech": "Step 5 of 6. Open your bag. Put in your lunch box from the fridge, your bus pass from the hook, and your phone. Zip the bag closed.",
+      "spoken": "Step 5 of 6. Open your bag. Put in your lunch box from the fridge, your bus pass from the hook, and your phone. Zip the bag closed.",
+      "verbatim": true,
+      "seconds": 2.8
+    },
+    {
+      "utterance": "I'm running late, like ten minutes",
+      "tool_calls": [
+        {
+          "name": "running_late",
+          "input": {
+            "minutes_left": 10.0,
+            "run_id": "run-f24f5a0958"
+          },
+          "status": "success",
+          "speech": "Okay. You have time for everything left. Step 5 of 6. Open your bag. Put in your lunch box from the fridge, your bus pass from the hook, and your phone. Zip the bag closed."
+        }
+      ],
+      "server_speech": "Okay. You have time for everything left. Step 5 of 6. Open your bag. Put in your lunch box from the fridge, your bus pass from the hook, and your phone. Zip the bag closed.",
+      "spoken": "Okay. You have time for everything left. Step 5 of 6. Open your bag. Put in your lunch box from the fridge, your bus pass from the hook, and your phone. Zip the bag closed.",
+      "verbatim": true,
+      "seconds": 2.95
+    },
+    {
+      "utterance": "all done, I'm good",
+      "tool_calls": [
+        {
+          "name": "step_done",
+          "input": {
+            "step_id": "bag",
+            "run_id": "run-f24f5a0958",
+            "all_remaining": true
+          },
+          "status": "success",
+          "speech": "Shoes and keys."
+        }
+      ],
+      "server_speech": "Shoes and keys.",
+      "spoken": "Shoes and keys.",
+      "verbatim": true,
+      "seconds": 3.04
+    }
+  ]
+}

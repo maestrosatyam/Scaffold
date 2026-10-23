@@ -146,6 +146,10 @@ describe('the headline workflow over MCP', () => {
     expect(s1.sc.step.step_id).toBe('teeth');
     expect(s1.sc.step.level).toBe('independent');
     expect(s1.sc.speech).toBe("Okay, morning routine. I'm here if you need me.");
+    // Clients that read only text blocks still get the ids to chain with (structured output as JSON text).
+    const blocks = (s1.raw.content as { type: string; text: string }[]).map((b) => b.text);
+    expect(blocks[0]).toBe(s1.sc.speech);
+    expect(JSON.parse(blocks[1]!)).toEqual(s1.sc);
     const runId = s1.sc.run.run_id;
 
     const d1 = await call(learner, 'step_done', { run_id: runId, step_id: 'teeth' });
