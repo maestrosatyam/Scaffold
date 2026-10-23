@@ -1,152 +1,126 @@
-# Product Feedback
+AWS SERVICES USED, AND HOW (AWS Builder mini-challenge)
 
-Every tool, API and SDK we actually used gets the five rules questions below. We separate what we used hands-on from what we only read or evaluated, and we don't claim usage that didn't happen.
+Scaffold runs live on AWS at https://tjncr2jv6v7sqw6jw467fbdyha0pesly.lambda-url.ap-southeast-2.on.aws/, deployed from one SAM template through CloudFormation.
 
----
+- AWS Lambda (Node.js 22, arm64) with a Function URL serves the MCP endpoint (/mcp), the demo sandbox API and the simulated Echo Show web app.
+- Amazon DynamoDB (on-demand, encrypted at rest, with TTL) holds each person's append-only event log. Appends use TransactWriteItems with a condition check on the last item and an idempotency token, so two devices can't overwrite each other. Replays use consistent, paginated queries. TTL clears out the demo sandboxes judges create.
+- Amazon CloudWatch keeps logs for 14 days and raises an alarm on errors, so we know if the demo goes down during judging.
+- AWS Budgets, Amazon SNS and a small guard Lambda enforce a $20/month cap. When actual spend reaches 100%, the guard sets the app's reserved concurrency to 0. We tested it on the live stack: 429 while capped, 200 after reset.
+- AWS CloudFormation and SAM: one template, with every resource tagged Project=scaffold-adh2026.
 
-## AWS services used, and how (AWS Builder mini-challenge)
-Scaffold runs live on AWS at https://tjncr2jv6v7sqw6jw467fbdyha0pesly.lambda-url.ap-southeast-2.on.aws/. It was deployed from `infra/template.yaml` (SAM) through CloudFormation.
-- **AWS Lambda (Node.js 22, arm64) with a Function URL.** It serves the MCP Streamable HTTP endpoint (`/mcp`), the demo sandbox API and the simulated Echo Show web app.
-- **Amazon DynamoDB (on-demand, SSE, TTL).** It holds the append-only, per-person event log:
-  - optimistic-concurrency appends with `TransactWriteItems` (a tail `ConditionCheck` plus an idempotency token);
-  - consistent paginated `Query` for replay;
-  - TTL for judge sandboxes.
-- **Amazon CloudWatch.** Logs with 14-day retention, and an error alarm for uptime through judging.
-- **AWS Budgets, Amazon SNS and a guard Lambda.** A $20/month cap that enforces itself. At 100% of actual spend, the guard sets reserved concurrency to 0. We tested it live: 429 while capped, 200 after reset.
-- **AWS CloudFormation / SAM.** One template, with every resource tagged `Project=scaffold-adh2026`.
+All 11 browser end-to-end tests pass against the live URL. The deployment record is in the repo at docs/evidence/aws/DEPLOYMENT.md.
 
-Evidence: `docs/evidence/aws/DEPLOYMENT.md`. All 11 browser end-to-end tests pass against the live URL.
 
----
+1. ALEXA+ FOR BUILDERS: MCP TOOLKIT DOCUMENTATION
 
-## 1. Alexa+ for Builders: MCP Toolkit documentation (read and designed against; toolkit itself not accessible)
-**What we used it for.** We designed our MCP server to the documented contract:
-- MCP spec 2025-11-25 over Streamable HTTP;
-- round trips under 500 ms;
-- functional requirement #13: stable ids, one intent per tool, honoured parameters;
-- MCP Apps (`ui://`) on a 768×480 Echo Show canvas;
-- voice guidance: at most 5 options, no IDs spoken, an explicit yes before transactions;
-- the auth tiers.
+The toolkit itself is limited to partners, so we worked from the documentation alone.
 
-Pages: overview, quickstart, client lifecycle, functional requirements, design guide, authentication, local inspector.
+What we used it for: we designed our server to the documented contract. That meant MCP spec 2025-11-25 over Streamable HTTP, round trips under 500 ms, and functional requirement #13 (stable ids, one intent per tool, only declare parameters you honour). It also meant MCP Apps cards on the 768×480 Echo Show screen, the voice guidance (at most 5 options, never speak ids, an explicit yes before transactions) and the authentication tiers. We read the overview, quickstart, client lifecycle, functional requirements, design guide, authentication and Local Inspector pages.
 
-**What worked well.**
-- The functional requirements are unusually concrete and actionable. The guidance to return stable IDs for chaining tools, and to declare only parameters you actually honor, directly shaped our `step_done(run_id, step_id)` idempotency design.
-- The split of responsibilities is clear: Alexa+ handles understanding and rendering, the server owns tools and data. That made "no LLM inside the server" an obvious, defensible architecture.
+What worked well: the functional requirements are unusually concrete. The advice to return stable ids so tools can be chained, and to declare only the parameters you actually honour, shaped our step_done(run_id, step_id) design, which makes repeated calls safe. The split of responsibilities is also clear: Alexa+ handles understanding and rendering, and the server owns the tools and data. That made it an easy decision to keep LLMs out of our server.
 
-**What needs work.**
-- **(a)** The client lifecycle example sends `protocolVersion: "2025-03-26"`, while the overview says the toolkit supports 2025-11-25 (friction F-01).
-- **(b)** The quickstart says "<500 ms" and the functional requirements say "within 3 seconds" (F-02).
-- **(c)** The quickstart says 2025-11-25 deprecated HTTP+SSE. That actually happened in 2025-03-26 (F-04).
-- **(d)** All validation tooling is private preview: the CLI, the Local Inspector and the simulator. Builders outside the partner program can't check tool selection, speech or card rendering (F-03).
+What needs work:
+- The client lifecycle example sends protocolVersion "2025-03-26", while the overview says the toolkit supports 2025-11-25 (friction log F-01).
+- The quickstart says responses must take under 500 ms, and the functional requirements say "within 3 seconds" (F-02).
+- The quickstart says the 2025-11-25 spec deprecated HTTP+SSE. That happened in 2025-03-26 (F-04).
+- All the validation tools are private preview: the CLI, the Local Inspector and the simulator. Builders outside the partner program can't check tool selection, speech or card rendering (F-03).
 
-**Onboarding (zero to hello world).** For a partner, the path looks reasonable on paper: `npm i -g @alexa-ai/cli`, then `configure`, `new mcp`, `deploy`. For us it stopped at the private CodeArtifact registry. We reached "hello world" only against our own simulated client.
+Getting started (zero to hello world): for a partner the path looks simple: npm i -g @alexa-ai/cli, then configure, new mcp, deploy. For us it stopped at the private CodeArtifact registry, and our "hello world" ran only against our own simulated client.
 
-**Would we build with it again?** **Yes**, once access opens. The MCP-native approach meant our server works with any MCP client today, and could be onboarded to Alexa+ without rewriting it.
+Would we build with it again? Yes, once access opens. Because the add-on is a standard MCP server, it already works with any MCP client and could be onboarded to Alexa+ without a rewrite.
 
-## 2. AWS SDK for JavaScript v3: `@aws-sdk/client-dynamodb` (used in code; contract-tested with mocks and running live on DynamoDB)
-**What we used it for.** The production event store (`src/store/dynamo.ts`):
-- consistent paginated `Query` (`LastEvaluatedKey`);
-- an optimistic-concurrency append with `TransactWriteItems`: a `ConditionCheck` on the tail item plus conditional `Put`s, with a deterministic `ClientRequestToken`;
-- `BatchWriteItem` with `UnprocessedItems` retry;
-- TTL attributes for demo sandboxes.
 
-**What worked well.**
-- The modular package keeps the bundle small.
-- Typed command inputs caught mistakes at compile time.
-- `TransactionCanceledException` is a real exported class, so error mapping is clean.
-- `aws-sdk-client-mock` made deterministic tests of pagination, cancellation and unprocessed-item retries easy.
+2. AWS SDK FOR JAVASCRIPT V3 (@aws-sdk/client-dynamodb)
 
-**What needs work.**
-- **Auto-generated `ClientRequestToken`.** Whether the SDK auto-generates the token and reuses it across its own retries isn't obvious from the API reference. We set one explicitly to be sure.
-- **Silent no-ops in conditions.** The interaction between `attribute_not_exists(pk)` and the full primary key confuses people. Our own reviewer had to confirm that it is evaluated against the item with the full key. A short doc note, "conditions are evaluated against the item with the full primary key", would help.
+What we used it for: our production event store. That covers consistent, paginated Query calls, appends guarded by TransactWriteItems (a ConditionCheck on the last item plus conditional Puts, with a fixed ClientRequestToken), BatchWriteItem with retries for unprocessed items, and TTL attributes for demo sandboxes.
 
-**Onboarding.** Writing the code was quick. DynamoDB Local (Docker) was too large for our disk budget, so we relied on contract tests until we had an account. Once deployed, the same store passed the full browser suite against the live table on its first run.
+What worked well: the modular packages keep the bundle small. Typed command inputs caught mistakes at compile time. TransactionCanceledException is an exported class, so mapping errors is clean. aws-sdk-client-mock made it easy to write deterministic tests for pagination, cancelled transactions and unprocessed-item retries.
 
-**Would we build with it again?** **Yes.**
+What needs work:
+- The API reference doesn't make clear whether the SDK generates a ClientRequestToken and reuses it across its own retries. We set one ourselves to be sure.
+- How attribute_not_exists(pk) interacts with the full primary key is easy to misread. We had to check that the condition is evaluated against the item with the full primary key. One sentence in the docs saying exactly that would help.
 
-## 3. AWS SAM / CloudFormation, Lambda Function URLs, Budgets and SNS (deployed)
-**What we used it for.** `infra/template.yaml` defines:
-- a Lambda (arm64) with a Function URL;
-- a DynamoDB table (on-demand, SSE, TTL);
-- a CloudWatch error alarm;
-- a $20/month AWS Budget wired through SNS to a guard Lambda that throttles the app to zero at the cap;
-- a log group with 14-day retention.
+Getting started: writing the code was quick. DynamoDB Local (Docker) needed more disk space than our machine had left, so we relied on mocked contract tests until we had an account. Once deployed, the same store passed the full browser suite against the live table on the first run.
 
-**What worked well.** `AWS::Serverless::Function` with `FunctionUrlConfig` and policy templates (`DynamoDBCrudPolicy`) keeps the template short. `AWS::Budgets::Budget` lets a hackathon project ship its own cost guard.
+Would we build with it again? Yes. Typed commands and the mock library let us get a transactional store right before we ever had a table.
 
-**What needs work.**
-- **The Function URL hostname is unknown until after deploy.** Our server needs it for a Host allowlist (DNS-rebinding protection), so a two-step deploy is required. Exposing the URL domain as a pre-deploy, predictable value, or documenting a recommended pattern, would help.
-- **No offline validation.** We couldn't run `sam validate` without installing the SAM CLI, which was too large for our disk budget. We deployed with the plain AWS CLI instead: `cloudformation package` plus `deploy` applies the SAM transform server-side. That worked well and deserves a mention in the SAM docs.
-- **No hard spending cap.** Budgets only alert. For a hackathon demo on a public URL, a built-in "stop at $X" switch would beat wiring Budgets → SNS → Lambda → `PutFunctionConcurrency(0)` by hand. On a new account the Lambda concurrency quota is 10, so reserving a small fixed concurrency for cost control isn't even allowed.
 
-**Onboarding.** The first deploy was quick. The hard part was account plumbing, not the template: Organizations policies, the CLI signing in to the wrong account, and Bedrock verification (friction entries F-10 and F-11). One real bug appeared only on the live URL (F-09).
+3. AWS SAM / CLOUDFORMATION, LAMBDA FUNCTION URLS, AWS BUDGETS AND AMAZON SNS
 
-**Would we build with it again?** **Yes.**
+What we used it for: one template (infra/template.yaml) defines the Lambda with its Function URL, the DynamoDB table, a CloudWatch error alarm, a log group with 14-day retention, and a $20/month budget wired through SNS to a guard Lambda that throttles the app to zero at the cap.
 
-## 4. MCP TypeScript SDK v2: `@modelcontextprotocol/server` 2.3.1, `/client` 2.3.1, `/node` 2.1.1, `/express` 2.0.2 (used heavily)
-**What we used it for.**
-- The server (`createMcpHandler`, `registerTool` with zod v4 input and output schemas, `structuredContent`, `instructions`).
-- `createMcpExpressApp` for Host and Origin validation.
-- The browser and Node clients: tests, the simulator, and a two-role trace.
+What worked well: AWS::Serverless::Function with FunctionUrlConfig and policy templates such as DynamoDBCrudPolicy keeps the template short. AWS::Budgets::Budget let a hackathon project ship its own cost guard.
 
-**What worked well.**
-- One stateless factory serves both protocol eras.
-- Building the server *per request* lets `tools/list` be role-scoped.
-- Server-side `outputSchema` validation.
-- Host and Origin protection by default on localhost.
+What needs work:
+- The Function URL hostname isn't known until after the first deploy. Our server needs it for a Host allowlist (protection against DNS rebinding), so we had to deploy twice. A hostname known before deploy, or a documented pattern, would help (F-07).
+- We couldn't validate the template offline without installing the SAM CLI, which needed more disk space than we had. We deployed with the plain AWS CLI instead: cloudformation package, then deploy, which applies the SAM transform on the server. That worked well and deserves a mention in the SAM docs.
+- Budgets only alert; there's no hard cap. For a demo on a public URL, a built-in "stop at $X" switch would beat wiring Budgets → SNS → Lambda → PutFunctionConcurrency(0) by hand. On a new account the Lambda concurrency quota is 10, so you can't even reserve a small fixed concurrency for cost control.
 
-**What needs work.**
-- **Behind `serverless-http` on Lambda, `express.json()` leaves `req.body` as a Buffer.** The transport then rejects every message as "not a valid JSON-RPC message". We had to parse the Buffer and synthesize `rawHeaders`. A note in the Lambda docs, or tolerance for Buffer bodies, would save others hours.
-- **An empty `allowedHosts: []` silently rejects everything**, including health checks. We would expect it to be treated as "unset" or to warn.
-- **Version upgrades can break code silently.** While working on our OSS contribution, we found that the official v1→v2 codemod turns `tool(name, annotations, cb)` into a broken schema (our fix is ready; PR not yet opened).
+Getting started: the first deploy was quick. Account setup took far longer than the template: Organizations policies, the CLI signing in to the wrong account, and Bedrock verification (F-10, F-11). One bug appeared only on the live URL (F-09).
 
-**Onboarding.** Very fast. The migration guide and the split packages are clear. A working Streamable HTTP server took minutes.
+Would we build with it again? Yes. One template gave us the whole stack, including a cost cap we could test, and every deploy is repeatable.
 
-**Would we build with it again?** **Yes.**
 
-## 5. MCP Apps (`@modelcontextprotocol/ext-apps` 2.0.3) (used: server helpers, View `App`, host `AppBridge`)
-**What we used it for.**
-- `registerAppTool` and `registerAppResource` on the server.
-- `App` inside four single-file views.
-- `AppBridge` with `PostMessageTransport` in our simulated host, so card buttons are real `tools/call` requests.
+4. MCP TYPESCRIPT SDK V2 (@modelcontextprotocol/server 2.3.1, /client 2.3.1, /node 2.1.1, /express 2.0.2)
 
-**What worked well.** The bridge proxies tools and resources automatically. Size-change notifications and host context work.
+What we used it for: the server itself (createMcpHandler, registerTool with zod v4 input and output schemas, structuredContent, server instructions), createMcpExpressApp for Host and Origin checks, and the browser and Node clients behind our tests, the simulator and a script that traces a learner and a coach side by side.
 
-**Onboarding.** We had a first card rendering inside our own host in under an hour, using the `app-bridge.examples` typings. A plain-HTML "minimal host" example would have made that faster.
+What worked well: one stateless handler serves both protocol versions. Building the server per request let us give each role its own tool list. Output schemas are validated on the server. Host and Origin protection is on by default for localhost.
 
-**What needs work.**
-- Bundling the View runtime adds about 225 KB per card. A smaller "view-only" entry would help constrained devices.
-- Playwright can't target elements inside a sandboxed srcdoc iframe by locator, so we fell back to coordinate clicks. A testing guide for hosts would help.
+What needs work:
+- On Lambda behind serverless-http, express.json() leaves req.body as a Buffer, and the transport rejects every message as "not a valid JSON-RPC message". We had to parse the Buffer ourselves and synthesize rawHeaders. A note in the docs, or accepting Buffer bodies, would save others hours (F-06).
+- An empty allowedHosts: [] silently rejects everything, health checks included. We'd expect it to be treated as unset, or at least to log a warning.
+- Upgrades can break code without any warning. While working on our open-source contribution we found that the official v1→v2 codemod turns tool(name, annotations, cb) into a broken schema. Our fix is on a public branch; the upstream PR isn't open yet.
 
-**Would we build with it again?** **Yes.**
+Getting started: very fast. The migration guide and the split packages are clear, and we had a working Streamable HTTP server in minutes.
 
-## 6. MCP Inspector CLI 2.11.0 and the MCP conformance suite 0.1.16 (used for evidence)
-**What we used them for.** Scripted protocol evidence against our server: `tools/list`, `tools/call`, `resources/list`, and the conformance `server` suite (see `docs/evidence/`).
+Would we build with it again? Yes. It's the reference implementation, and building a server per request made role-scoped tools simple.
 
-**Onboarding.** One `npx` command each, with no install or config. The Inspector worked the first time.
 
-**What worked well.** `--cli … --method tools/list|tools/call|resources/list` made scripted protocol evidence trivial.
+5. MCP APPS (@modelcontextprotocol/ext-apps 2.0.3)
 
-**What needs work.** The conformance `server` suite assumes the reference fixture tools (`test_simple_text`, …). Against a real product server, 24 of 30 scenarios fail by construction. A "product server" profile that only checks the transport, lifecycle, security and declared capabilities would make the results meaningful.
+What we used it for: registerAppTool and registerAppResource on the server, the App runtime inside four single-file card views, and AppBridge with PostMessageTransport in our simulated host, so the buttons on a card send real tools/call requests.
 
-**Would we use them again?** **Yes.**
+What worked well: the bridge forwards tool and resource calls with no extra code, and size-change notifications and host context work as documented.
 
-## 7. Strands Agents Python SDK (`strands-agents/harness-sdk`) (used for our second open-source contribution)
-**What we used it for.** We reproduced and fixed issue #4896: concurrent `MCPClient.load_tools()` calls failing.
+What needs work:
+- Bundling the view runtime adds about 225 KB to each card. A smaller view-only entry point would help on constrained devices.
+- Playwright can't target elements inside a sandboxed srcdoc iframe with locators, so our tests fall back to clicking coordinates. A testing guide for hosts would help.
 
-**What worked well.**
-- A large, fast unit-test suite.
-- Clear contribution guidelines.
-- An MCP client design that mirrors the TypeScript SDK, which made the fix's semantics easy to align.
+Getting started: we had a first card rendering inside our own host in under an hour, using the typings in the app-bridge examples. A plain-HTML minimal host example would have made it faster.
 
-**What needs work.** Optional extras make the full local test run noisy: failures from extras that aren't installed, plus mypy errors. A documented "core-only" test command would help outside contributors.
+Would we build with it again? Yes. It gave us tappable Echo Show cards from a standard MCP server with very little glue code.
 
-**Onboarding.** `uv` plus an editable install got the MCP test subset running quickly. Working out which extras the full suite needs took longer.
 
-**Would we build with it again?** **Yes.**
+6. MCP INSPECTOR CLI 2.11.0 AND THE MCP CONFORMANCE SUITE 0.1.16
 
-## 8. Evaluated but not used
-- **Fire TV Vega SDK.** It needs about 20 GB of disk, more than we had (F-05).
-- **Ring Developer Playground.** It needs an account and offers no event simulation. We didn't proceed.
-- **Bee.** It needs a device, which we don't have.
+What we used them for: scripted protocol checks against our server (tools/list, tools/call, resources/list) and the conformance suite's server scenarios. The transcripts are in the repo under docs/evidence/.
+
+What worked well: --cli with --method tools/list, tools/call or resources/list made scripted checks trivial.
+
+What needs work: the conformance suite's server scenarios assume the reference fixture tools (test_simple_text and others). Against a real product server, 24 of 30 scenarios fail for that reason alone. A "product server" profile that checks only transport, lifecycle, security and declared capabilities would make the results meaningful.
+
+Getting started: one npx command each, with nothing to install or configure. The Inspector worked the first time.
+
+Would we use them again? Yes. They're the quickest independent check that a server speaks MCP correctly.
+
+
+7. STRANDS AGENTS PYTHON SDK (strands-agents/harness-sdk)
+
+What we used it for: our second open-source contribution. We reproduced and fixed issue #4896, where concurrent MCPClient.load_tools() calls fail.
+
+What worked well: a large, fast unit-test suite, clear contribution guidelines, and an MCP client design that mirrors the TypeScript SDK, which made it easy to match the fix to how the TypeScript client behaves.
+
+What needs work: optional extras make a full local test run noisy, with failures from extras that aren't installed and mypy errors. A documented core-only test command would help outside contributors.
+
+Getting started: uv plus an editable install got the MCP tests running quickly. Working out which extras the full suite needs took longer.
+
+Would we build with it again? Yes. The codebase was easy to work in, and the MCP client is cleanly structured.
+
+
+8. TRIED OR EVALUATED, BUT NOT USED
+
+- Amazon Bedrock (Nova 2 Lite, through Strands Agents): we wanted to show an LLM choosing Scaffold's tools. On deadline day our new account was first held for verification, then refused with "Too many tokens per day", so we dropped the feature (F-10).
+- Fire TV Vega SDK: it needs about 20 GB of disk space, more than we had (F-05).
+- Ring Developer Playground: it needs an account and offers no event simulation, so we didn't go further.
+- Bee: it needs a device, which we don't have.
